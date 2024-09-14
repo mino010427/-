@@ -1,2 +1,2 @@
-# Data-connection
+# Data-communication
  데통
