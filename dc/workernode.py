@@ -4,6 +4,8 @@ import random
 from queue import Queue
 import socket
 
+#살려줘
+
 class WorkerNode:
     def __init__(self, worker_id, task_queue, worker_queues, log):
         self.worker_id = worker_id
