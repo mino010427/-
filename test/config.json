@@ -1,30 +1,27 @@
-# YOUR_MASTER_IP를 실제 마스터 노드의 외부 IP 주소로 변경합니다.
-# 워커 노드의 IP 주소도 실제 워커 노드의 IP로 변경해야 합니다.
-
 {
     "master": {
-        "ip": "YOUR_MASTER_IP",  
+        "ip": "34.68.170.234",  
         "port": 5000
     },
     "workers": [
         {
             "id": 1,
-            "ip": "WORKER1_IP",  
+            "ip": "127.0.0.1",  
             "port": 5001
         },
         {
             "id": 2,
-            "ip": "WORKER2_IP",
+            "ip": "127.0.0.1",
             "port": 5002
         },
         {
             "id": 3,
-            "ip": "WORKER3_IP",
+            "ip": "127.0.0.1",
             "port": 5003
         },
         {
             "id": 4,
-            "ip": "WORKER4_IP",
+            "ip": "127.0.0.1",
             "port": 5004
         }
     ]
