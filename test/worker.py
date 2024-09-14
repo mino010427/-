@@ -21,8 +21,8 @@ if len(sys.argv) != 2:
     sys.exit(1)
 
 worker_id = int(sys.argv[1])
-if worker_id < 1 or worker_id > len(WORKERS):
-    print(f"Worker ID must be between 1 and {len(WORKERS)}")
+if worker_id < 1 or worker_id > len(WORKER_INFO):
+    print(f"Worker ID must be between 1 and {len(WORKER_INFO)}")
     sys.exit(1)
 
 WORKER_IP = WORKER_INFO[worker_id - 1]['ip']

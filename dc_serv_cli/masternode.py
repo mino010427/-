@@ -1,64 +1,9 @@
+import socket
 import threading
-import time
-import random
 import numpy as np
 from queue import Queue
+import time
 
-# 행렬 크기 및 작업 큐 설정
-N = 1000
-A = np.random.randint(1, 100, (N, N))
-B = np.random.randint(1, 100, (N, N))
-C = np.zeros((N, N))
-task_queue = Queue()
-
-# Worker Node를 담당하는 스레드
-def worker_node(worker_id):
-    task_count = 0  # 각 워커 노드의 작업 수를 관리하는 변수
-
-    while not task_queue.empty():
-        if task_count >= 10:  # 할당된 작업이 10개를 넘으면 중단
-            print(f"Worker {worker_id}: 작업 할당 초과, 실패 처리")
-            break
-
-        task = task_queue.get()
-        i, j = task
-        try:
-            # 1~3초 동안 무작위로 시간이 소요됨
-            task_time = random.uniform(1, 3)
-            time.sleep(task_time)
-            
-            # 80% 확률로 성공, 20% 확률로 실패
-            if random.random() < 0.8:
-                C[i, j] = sum(A[i, k] * B[k, j] for k in range(N))
-                print(f"Worker {worker_id} 성공: C[{i}, {j}] = {C[i, j]}")
-                task_count += 1  # 작업 성공 시 카운트 증가
-            else:
-                raise Exception(f"Worker {worker_id} 실패: C[{i}, {j}]")
-        except Exception as e:
-            print(e)
-            task_queue.put(task)  # 실패한 작업을 다시 큐에 넣음
-        finally:
-            task_queue.task_done()
-
-# Master Node 역할: 작업 분배 및 관리
-def master_node():
-    # 작업 분배 (C[i, j] 계산 작업)
-    for i in range(N):
-        for j in range(N):
-            task_queue.put((i, j))
-
-    # 스레드 풀 생성
-    threads = []
-    for worker_id in range(10):  # 10개의 Worker Node 스레드
-        thread = threading.Thread(target=worker_node, args=(worker_id,))
-        threads.append(thread)
-        thread.start()
-
-    # 모든 스레드가 작업을 완료할 때까지 대기
-    for thread in threads:
-        thread.join()
-
-# System Clock 클래스
 class SystemClock:
     def __init__(self):
         self.start_time = time.time()
@@ -66,11 +11,68 @@ class SystemClock:
     def get_elapsed_time(self):
         return time.time() - self.start_time
 
-# System Clock 시작
-system_clock = SystemClock()
+class MasterNode:
+    def __init__(self, host='0.0.0.0', port=9999):
+        self.host = host
+        self.port = port
+        self.system_clock = SystemClock()
+        self.task_queue = Queue()
+        self.worker_sockets = []
+        self.C = np.zeros((1000, 1000))  # 결과 행렬
 
-# Master Node 실행
-master_node()
+    def handle_worker(self, client_socket, address):
+        while True:
+            try:
+                # Worker Node로부터 데이터 수신 (작업 결과 혹은 실패 메시지)
+                data = client_socket.recv(1024).decode()
+                if not data:
+                    break
+                print(f"[{self.system_clock.get_elapsed_time():.2f} sec] Received from {address}: {data}")
 
-# 총 소요 시간 출력
-print(f"Total elapsed time: {system_clock.get_elapsed_time()} seconds")
+                # 작업 재할당 혹은 추가 처리에 대한 로직 구현 필요
+                # 예시: 다른 Worker Node로 작업 재분배 등
+                # self.reassign_task()
+            except Exception as e:
+                print(f"Error handling worker {address}: {e}")
+                break
+
+        client_socket.close()
+
+    def distribute_tasks(self):
+        # 1000x1000 행렬 생성
+        A = np.random.randint(1, 100, (1000, 1000))
+        B = np.random.randint(1, 100, (1000, 1000))
+
+        # 각 작업을 큐에 추가 (C[i, j] 연산 작업)
+        for i in range(1000):
+            for j in range(1000):
+                self.task_queue.put((i, j, A[i], B[:, j]))  # 각 열에 대한 작업 추가
+
+    def log_event(self, message):
+        with open('Master.txt', 'a') as log_file:
+            log_file.write(f"{self.system_clock.get_elapsed_time():.2f} - {message}\n")
+
+    def run(self):
+        # 소켓 설정
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind((self.host, self.port))
+        server_socket.listen(5)
+
+        print(f"Master Node started on {self.host}:{self.port}")
+
+        self.distribute_tasks()
+
+        while True:
+            # Worker Node와 연결 수립
+            client_socket, address = server_socket.accept()
+            print(f"Connected to Worker Node at {address}")
+            self.worker_sockets.append(client_socket)
+
+            # Worker Node와의 통신을 처리할 스레드 생성
+            worker_thread = threading.Thread(target=self.handle_worker, args=(client_socket, address))
+            worker_thread.start()
+
+# Google Cloud VM에서 실행될 Master Node
+if __name__ == "__main__":
+    master_node = MasterNode(host="0.0.0.0", port=9999)  # 외부 통신을 허용하는 IP
+    master_node.run()
