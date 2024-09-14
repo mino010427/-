@@ -3,7 +3,7 @@ import time
 import random
 import numpy as np
 from queue import Queue
-
+#남태인 왔다감
 # 행렬 크기 및 작업 큐 설정
 N = 1000
 A = np.random.randint(1, 100, (N, N))
