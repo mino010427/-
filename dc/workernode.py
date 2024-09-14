@@ -71,3 +71,5 @@ class WorkerNode:
         print(f"  처리한 작업 수: {self.task_count}")
         print(f"  평균 작업 시간: {avg_task_time:.2f}초")
         print(f"  전체 수행 시간: {total_time:.2f}초")
+
+print('hello')
