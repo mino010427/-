@@ -1,5 +1,6 @@
 import socket
 import threading
+import random
 import numpy as np
 import time
 
@@ -50,16 +51,12 @@ def master_handler(conn, addr):
     print(f"{addr}에서 연결됨")
     worker_sockets.append(conn)
     worker_status[addr] = 0  # 워커의 초기 부하 상태
-    
-    # 모든 워커 노드가 연결될 때까지 대기
-    while len(worker_sockets) < 4:
-        pass
 
-    print("모든 워커 노드가 연결되었습니다. 작업을 시작합니다.")
-    
-    for i in range(N):
-        for j in range(N):
-            assign_task(i, j)
+    if len(worker_sockets) == 4:
+        # 워커 노드가 4개 연결되었을 때만 작업을 분배 시작
+        for i in range(N):
+            for j in range(N):
+                assign_task(i, j)
 
 def main():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -71,8 +68,12 @@ def main():
             conn, addr = s.accept()
             threading.Thread(target=master_handler, args=(conn, addr)).start()
         
+        # 모든 작업이 완료될 때까지 대기
+        while np.any(result_matrix == 0):  # 결과 행렬이 모두 채워질 때까지
+            time.sleep(1)  # 1초마다 대기
+        
         # 모든 작업이 끝나면 종료
-        print("모든 행렬 연산 완료!")
+        print("모든 행렬 연산 완료!")  # #수정: 모든 작업 완료 후 출력
         np.savetxt('result_matrix.txt', result_matrix, fmt='%d')
 
 if __name__ == "__main__":
