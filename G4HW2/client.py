@@ -6,7 +6,7 @@ import threading
 import time
 import ast
 
-HOST = '34.83.112.100'
+HOST = '34.68.170.234' #vm 외부 ip
 PORT = 8080
 
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
