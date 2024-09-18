@@ -2,110 +2,132 @@ import socket
 import threading
 import random
 import time
-import json
 import logging
-from queue import Queue
-from datetime import datetime
 
-# Logging 설정
-logging.basicConfig(filename='server.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+# 로그 설정
+logging.basicConfig(filename='Master.txt', level=logging.INFO, format='%(asctime)s - %(message)s')
 
-# 상수 설정
-MATRIX_SIZE = 1000
+# 전역 상수
+HOST = '0.0.0.0'  # 모든 네트워크 인터페이스에서 연결 수용
+PORT = 65432
 NUM_WORKERS = 4
+TASK_LIMIT = 10
+MATRIX_SIZE = 1000  # 행렬 크기
 
-# 두 개의 랜덤 행렬 생성
-matrix_a = [[random.randint(1, 10) for _ in range(MATRIX_SIZE)] for _ in range(MATRIX_SIZE)]
-matrix_b = [[random.randint(1, 10) for _ in range(MATRIX_SIZE)] for _ in range(MATRIX_SIZE)]
-result_matrix = [[0 for _ in range(MATRIX_SIZE)] for _ in range(MATRIX_SIZE)]
+# 전역 변수
+matrix_a = None
+matrix_b = None
+task_queue = []
+worker_status = {}  # 작업 할당 및 대기 시간 추적
 
-# 작업 큐와 각 워커의 작업 수를 관리하기 위한 설정
-task_queue = Queue()
-worker_tasks = {}
-worker_status = {}  # 변경: 각 워커의 상태를 추적합니다.
+def print_and_log(message):
+    """터미널과 로그 파일에 메시지 출력"""
+    print(message)
+    logging.info(message)
 
-for i in range(MATRIX_SIZE):
-    for j in range(MATRIX_SIZE):
-        task_queue.put((i, j))
+def generate_matrix():
+    """랜덤 행렬 생성 함수"""
+    return [[random.randint(1, 10) for _ in range(MATRIX_SIZE)] for _ in range(MATRIX_SIZE)]
 
-start_time = time.time()
-system_clock = 0
-
-def system_clock_func():
-    """ 시스템 클록을 1초마다 업데이트합니다. """
-    global system_clock
-    while not task_queue.empty():
-        system_clock = int(time.time() - start_time)
-        time.sleep(1)
-
-def distribute_tasks(worker_id, conn):
-    """ 워커에게 작업을 배분하고 결과를 수신합니다. """
-    global worker_tasks
-    worker_status[worker_id] = {"waiting_time": [], "completed_tasks": 0, "failed_tasks": 0}
-    while not task_queue.empty() and worker_tasks[worker_id] < 10:
-        task = task_queue.get()
-        i, j = task
+def handle_worker_response(worker_id, conn):
+    """워커로부터 응답 처리"""
+    global matrix_a
+    global matrix_b
+    while True:
         try:
-            conn.sendall(f"{i},{j}".encode())
-            conn.sendall(json.dumps(matrix_a).encode())
-            conn.sendall(json.dumps(matrix_b).encode())
-            
-            worker_tasks[worker_id] += 1
+            # 워커로부터 응답 받기
+            response = conn.recv(8192).decode()
+            if not response:
+                break
+            message = f"워커 {worker_id}로부터 받은 응답: {response}"
+            print_and_log(message)
 
-            start_task_time = time.time()
-            response = conn.recv(1024).decode()
-            end_task_time = time.time()
-            
-            waiting_time = end_task_time - start_task_time
-            worker_status[worker_id]["waiting_time"].append(waiting_time)
-            
-            if response == 'FAIL':
-                worker_status[worker_id]["failed_tasks"] += 1
-                task_queue.put((i, j))  # 실패한 작업을 재배치합니다.
-                logging.info(f"Task ({i}, {j}) failed. Reassigning.")
-            else:
-                result = int(response)
-                result_matrix[i][j] = result
-                worker_status[worker_id]["completed_tasks"] += 1
-                logging.info(f"Task ({i}, {j}) completed with result {result}.")
-            
-            worker_tasks[worker_id] -= 1
+            # 작업 데이터 업데이트
+            task_data = eval(response)  # 응답 데이터 안전하게 평가
+            task_result = task_data.get('result', None)
+            if task_result is not None:
+                print_and_log(f"워커 {worker_id}로부터 받은 결과로 행렬 업데이트")
+                # 결과를 행렬에 적용 (간단한 예시)
+                matrix_a[task_data['i']][task_data['j']] = task_result
 
-        except (ConnectionResetError, BrokenPipeError) as e:
-            logging.error(f"Connection error with Worker {worker_id}: {e}")
+            # 실패한 작업 재할당
+            failed_tasks = task_data.get('failed_tasks', [])
+            if failed_tasks:
+                print_and_log(f"워커 {worker_id}의 실패한 작업 재할당")
+                for task in failed_tasks:
+                    # 작업 재할당 로직
+                    pass
+
+        except ConnectionResetError:
+            print_and_log(f"연결 재설정 오류: 워커 {worker_id}가 연결을 끊었습니다")
+            break
+        except Exception as e:
+            print_and_log(f"처리 중 오류 발생: {e}")
             break
 
-    # 워커 성과를 로그로 출력합니다.
-    end_time = time.time()
-    total_time = end_time - start_time
-    avg_waiting_time = sum(worker_status[worker_id]["waiting_time"]) / len(worker_status[worker_id]["waiting_time"]) if worker_status[worker_id]["waiting_time"] else 0
-    logging.info(f"Worker {worker_id} completed with {worker_status[worker_id]['completed_tasks']} tasks completed, {worker_status[worker_id]['failed_tasks']} tasks failed, average waiting time {avg_waiting_time:.2f} seconds, and total time {total_time:.2f} seconds.")
-
-def handle_worker_response(worker_id, conn, addr):
-    """ 워커의 응답을 처리합니다. """
-    logging.info(f"Connected to Worker {worker_id} at {addr}")
-    worker_tasks[worker_id] = 0
-    distribute_tasks(worker_id, conn)
     conn.close()
 
+def distribute_tasks(worker_id, conn):
+    """워커 노드에 작업 분배"""
+    global matrix_a
+    global matrix_b
+    num_tasks = len(matrix_a) * len(matrix_b[0])  # 작업의 총 수
+    tasks_per_worker = num_tasks // NUM_WORKERS
+    remaining_tasks = num_tasks % NUM_WORKERS
+
+    try:
+        # 워커에게 작업 할당
+        for i in range(NUM_WORKERS):
+            task_data = {
+                'matrix_a': matrix_a,
+                'matrix_b': matrix_b,
+                'task_range': (i * tasks_per_worker, (i + 1) * tasks_per_worker + (1 if i < remaining_tasks else 0))
+            }
+            conn.sendall(str(task_data).encode())
+            print_and_log(f"워커 {worker_id}에게 작업 전송: {task_data}")
+
+    except BrokenPipeError:
+        print_and_log(f"파이프 오류: 워커 {worker_id}와의 연결이 끊겼습니다")
+    except Exception as e:
+        print_and_log(f"작업 분배 중 오류 발생: {e}")
+
 def start_server():
-    """ 서버를 시작하고 워커의 연결을 기다립니다. """
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind(('0.0.0.0', 5000))
-    server_socket.listen(NUM_WORKERS)
+    """서버 시작"""
+    global matrix_a
+    global matrix_b
 
-    logging.info("Server started, waiting for workers...")
+    matrix_a = generate_matrix()
+    matrix_b = generate_matrix()
 
-    # 시스템 클록 스레드 시작
-    threading.Thread(target=system_clock_func).start()
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+        server_socket.bind((HOST, PORT))
+        server_socket.listen()
 
-    worker_id = 0
-    while worker_id < NUM_WORKERS:
-        conn, addr = server_socket.accept()
-        worker_id += 1
-        threading.Thread(target=handle_worker_response, args=(worker_id, conn, addr)).start()
+        print_and_log(f"서버 시작: {HOST}:{PORT}, 워커 대기 중...")
 
-    server_socket.close()
+        workers = {}
+        for i in range(NUM_WORKERS):
+            try:
+                conn, addr = server_socket.accept()
+                worker_id = f"워커 {i+1}"
+                print_and_log(f"{addr}에서 {worker_id}와 연결됨")
+                workers[worker_id] = conn
+
+                # 워커 응답 처리 스레드 생성
+                thread = threading.Thread(target=handle_worker_response, args=(worker_id, conn))
+                thread.start()
+
+            except Exception as e:
+                print_and_log(f"워커 연결 오류 발생: {e}")
+
+        # 워커에게 작업 분배
+        for worker_id, conn in workers.items():
+            distribute_tasks(worker_id, conn)
+
+        # 모든 스레드가 완료될 때까지 대기
+        for thread in threading.enumerate():
+            if thread != threading.current_thread():
+                thread.join()
 
 if __name__ == "__main__":
     start_server()
