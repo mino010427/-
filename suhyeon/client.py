@@ -9,7 +9,7 @@ logging.basicConfig(filename=f'Worker{random.randint(1,4)}.txt', level=logging.I
 # 전역 상수
 HOST = '34.68.170.234'  # 서버 주소
 PORT = 65432
-TASK_LIMIT = 10
+TASK_LIMIT = 1023 
 
 def print_and_log(message):
     """터미널과 로그 파일에 메시지 출력"""

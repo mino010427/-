@@ -24,6 +24,7 @@ class MasterNode:
         self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
         self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
         self.task_queue = Queue()  # 작업 큐
+        self.failed_queue = Queue() # 작업 실패 큐
         self.lock = threading.Lock()  # 뮤텍스
 
     def handle_worker(self, client_socket, address):
