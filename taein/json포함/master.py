@@ -23,6 +23,7 @@ class MasterNode:
         self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
         self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
         self.task_queue = Queue()  # 작업 큐
+        self.failed_queue = Queue()  # 실패한 작업 큐 추가
         self.lock = threading.Lock()  # 뮤텍스 추가
 
     def handle_worker(self, client_socket, address):
@@ -61,15 +62,25 @@ class MasterNode:
         distribution_thread.start()
 
     def distribute_tasks(self):
-        # Worker Node에 동적으로 작업을 분배
         while True:
-            for worker_socket in self.worker_sockets:
+            # 먼저 실패한 작업이 있는지 확인
+            if not self.failed_queue.empty():
+                with self.lock:
+                    failed_task_data = self.failed_queue.get()
+                # 실패한 작업을 우선적으로 분배
+                for worker_socket in self.worker_sockets:
+                    worker_socket.send(failed_task_data.encode('utf-8'))
+                    print(f"Resent failed task to {self.worker_ids[worker_socket]}")
+                    break  # 한 번에 하나의 실패 작업만 분배 후 다시 대기
+            else: # Worker Node에 동적으로 작업을 분배
+                # 실패한 작업이 없으면 일반 작업 큐에서 작업 분배
                 if not self.task_queue.empty():
-                    with self.lock:  # 작업 큐에서 꺼낼 때 뮤텍스 잠금
+                    with self.lock: # 작업 큐에서 꺼낼 때 뮤텍스 잠금
                         task_data = self.task_queue.get()
-                    worker_socket.send(task_data.encode('utf-8'))  # JSON 형식으로 전송
-                    print(f"Sent task to {self.worker_ids[worker_socket]}")
-            time.sleep(1)  # 분배 주기 조절
+                    for worker_socket in self.worker_sockets:
+                        worker_socket.send(task_data.encode('utf-8'))
+                        print(f"Sent task to {self.worker_ids[worker_socket]}")
+            time.sleep(1) # 분배 주기 조절
 
     def receive_results(self, worker_socket):
         # 각 Worker Node로부터 결과 수신 및 재할당 처리
@@ -83,7 +94,7 @@ class MasterNode:
                         task_data = result.split("failed task for ")[1]
                         
                         with self.lock:  # 작업 큐에 실패한 작업을 추가할 때 뮤텍스 잠금
-                            self.task_queue.put(task_data)  # 실패한 작업을 큐에 추가
+                            self.failed_queue.put(task_data)  # 실패한 작업을 실패 큐에 추가
                     else:
                         print(f"Received result from {self.worker_ids[worker_socket]}: {result}")
                 time.sleep(1)  # 통신 지연 시뮬레이션
