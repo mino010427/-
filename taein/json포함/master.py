@@ -23,7 +23,7 @@ class MasterNode:
         self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
         self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
         self.task_queue = Queue()  # 작업 큐
-        self.lock = threading.Lock()  # **뮤텍스 추가**
+        self.lock = threading.Lock()  # 뮤텍스 추가
 
     def handle_worker(self, client_socket, address):
         # Worker Node를 연결 목록에 추가 및 ID 할당
@@ -37,35 +37,39 @@ class MasterNode:
         while True:
             if self.connected_workers == 4:
                 print("All 4 Worker Nodes are connected. Distributing tasks...")
-                self.distribute_tasks()
+                self.distribute_config()
                 break
 
-    def distribute_tasks(self):
-        # 모든 작업을 동적으로 분배하기 위해 작업 큐에 추가
-        print(1)
+    def add_tasks_to_queue(self):
+        # 모든 작업을 작업 큐에 추가
         for i in range(1000):
             for j in range(1000):
-                print(1.5)
                 A_row = self.A[i, :].tolist()
                 B_col = self.B[:, j].tolist()
                 task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
                 
-                with self.lock:  # **큐에 접근할 때 뮤텍스 잠금**
+                with self.lock:  # 큐에 접근할 때 뮤텍스 잠금
                     self.task_queue.put(task_data)
-        print(2)
+
+    def distribute_config(self):
         # 각 Worker Node가 작업을 수신할 수 있도록 스레드를 시작함
         for worker_socket in self.worker_sockets:
             threading.Thread(target=self.receive_results, args=(worker_socket,)).start()
-        print(3)    
+
+        # 작업 분배를 위한 스레드 시작
+        distribution_thread = threading.Thread(target=self.distribute_tasks)
+        distribution_thread.start()
+
+    def distribute_tasks(self):
         # Worker Node에 동적으로 작업을 분배
-        while not self.task_queue.empty():
+        while True:
             for worker_socket in self.worker_sockets:
                 if not self.task_queue.empty():
-                    with self.lock:  # **작업 큐에서 꺼낼 때 뮤텍스 잠금**
+                    with self.lock:  # 작업 큐에서 꺼낼 때 뮤텍스 잠금
                         task_data = self.task_queue.get()
-       
                     worker_socket.send(task_data.encode('utf-8'))  # JSON 형식으로 전송
                     print(f"Sent task to {self.worker_ids[worker_socket]}")
+            time.sleep(1)  # 분배 주기 조절
 
     def receive_results(self, worker_socket):
         # 각 Worker Node로부터 결과 수신 및 재할당 처리
@@ -78,7 +82,7 @@ class MasterNode:
                         print(f"Received failure from {self.worker_ids[worker_socket]}: {result}")
                         task_data = result.split("failed task for ")[1]
                         
-                        with self.lock:  # **작업 큐에 실패한 작업을 추가할 때 뮤텍스 잠금**
+                        with self.lock:  # 작업 큐에 실패한 작업을 추가할 때 뮤텍스 잠금
                             self.task_queue.put(task_data)  # 실패한 작업을 큐에 추가
                     else:
                         print(f"Received result from {self.worker_ids[worker_socket]}: {result}")
@@ -99,6 +103,10 @@ class MasterNode:
             client_socket, address = server_socket.accept()
             worker_thread = threading.Thread(target=self.handle_worker, args=(client_socket, address))
             worker_thread.start()
+
+        # 작업 추가를 위한 스레드 시작
+        task_addition_thread = threading.Thread(target=self.add_tasks_to_queue)
+        task_addition_thread.start()
 
         print("All 4 Worker Nodes are connected. Proceeding with task distribution...")
 
