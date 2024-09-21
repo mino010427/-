@@ -39,7 +39,7 @@ class WorkerNode:
         while True:
             try:
                 task_data = self.client_socket.recv(1024).decode()
-                print('서버로 붙어 작업수신')
+                print('서버로부터 작업수신')
                 if task_data:
                     # 큐가 가득 찬 경우 작업 실패 처리
                     try:
