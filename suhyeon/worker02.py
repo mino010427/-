@@ -3,7 +3,7 @@ import random
 import numpy as np
 import time
 import json
-from queue import Queue, Full
+from queue import Queue
 import threading
 
 class SystemClock:
@@ -15,7 +15,7 @@ class SystemClock:
 
 class WorkerNode:
     def __init__(self, master_host, master_port):
-        self.worker_id = None  # 워커 ID 초기화
+        self.worker_id = f"worker{random.randint(1, 100)}"  # 랜덤 워커 ID 생성
         self.master_host = master_host  # 마스터 노드 호스트
         self.master_port = master_port  # 마스터 노드 포트
         self.system_clock = SystemClock()  # 시스템 클락 객체 생성
@@ -24,13 +24,12 @@ class WorkerNode:
         self.failure_count = 0  # 실패 횟수
         self.total_wait_time = 0  # 총 대기 시간
         self.total_tasks = 0  # 총 작업 수
-        self.log_file = open(f"Worker{self.worker_id}.txt", "w")  # 로그 파일 오픈
+        self.log_file = open(f"Worker_{self.worker_id}.txt", "w")  # 로그 파일 오픈
 
     def connect_to_master(self):
         """ 마스터 노드에 연결하는 함수. """
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.connect((self.master_host, self.master_port))  # 마스터 노드에 연결
-        self.worker_id = f"worker{random.randint(1, 100)}"  # 랜덤 워커 ID 생성
         print(f"{self.worker_id} 마스터 노드에 연결됨.")
 
     def receive_task(self):
@@ -39,12 +38,12 @@ class WorkerNode:
             try:
                 task_data = self.socket.recv(1024).decode()  # 작업 수신
                 if task_data:
-                    self.process_received_task(task_data)  # 수신한 작업 처리
+                    self.process_task(task_data)  # 수신한 작업 처리
             except Exception as e:
                 print(f"{self.worker_id} 작업 수신 중 오류 발생: {e}")
                 break
 
-    def process_received_task(self, task_data):
+    def process_task(self, task_data):
         """ 수신한 작업을 처리하는 함수. """
         task_info = json.loads(task_data)  # 작업 정보를 JSON 형식으로 변환
         A_row = np.array(task_info['A_row'])  # A 행렬의 i번째 행
@@ -83,7 +82,10 @@ class WorkerNode:
         """ 워커 노드를 시작하고 마스터와의 연결을 관리하는 메인 함수. """
         self.connect_to_master()
         threading.Thread(target=self.receive_task).start()  # 작업 수신 스레드 시작
-        self.process_task()  # 작업 처리
+        # 이 부분은 remove, process_task 호출이 필요 없음
+        # self.process_task()  # 작업 처리
+        # 대신, 작업 수신이 되면 자동으로 처리됨
+        # 결과 로그 출력은 수신 스레드 종료 후 호출
         self.log_results()  # 작업 종료 후 결과 로그 출력
 
 # 워커 노드 실행
