@@ -92,5 +92,5 @@ class WorkerNode:
 
 # 외부 통신을 위한 Worker Node
 if __name__ == "__main__":
-    worker_node = WorkerNode(master_host="34.68.170.234", master_port=9999)  # Google Cloud VM 외부 IP 주소
+    worker_node = WorkerNode(master_host="127.0.0.1", master_port=9999)  # Google Cloud VM 외부 IP 주소
     worker_node.run()

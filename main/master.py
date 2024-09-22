@@ -62,39 +62,39 @@ class MasterNode:
         distribution_thread.start()
 
     
+def distribute_tasks(self):
+    while True:
+        # 먼저 실패한 작업이 있는지 확인
+        if not self.failed_queue.empty():
+            with self.lock:
+                failed_task_info = self.failed_queue.get()  # 실패한 작업 정보를 가져옴
+                
+                # 실패한 작업의 i, j 인덱스 추출 (예: 'worker1 failed task for C[2, 3]')
+                i, j = map(int, failed_task_info.split("C[")[1].rstrip(']').split(', '))
+                
+                # 실패한 작업의 행렬 데이터를 다시 준비
+                A_row = self.A[i, :].tolist()
+                B_col = self.B[:, j].tolist()
+                
+                # 작업 데이터를 다시 구성
+                task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
 
-    def distribute_tasks(self):
-        while True:
-            # 먼저 실패한 작업이 있는지 확인
-            if not self.failed_queue.empty():
+            # 실패한 작업을 우선적으로 분배
+            for worker_socket in self.worker_sockets:
+                worker_socket.send(task_data.encode('utf-8'))  # 재구성한 작업 데이터를 전송
+                print(f"Resent failed task to {self.worker_ids[worker_socket]} for C[{i}, {j}]")
+                break  # 한 번에 하나의 실패 작업만 분배 후 다시 대기
+        else:
+            # 실패한 작업이 없으면 일반 작업 큐에서 작업 분배
+            if not self.task_queue.empty():
                 with self.lock:
-                    failed_task_info = self.failed_queue.get()  # 실패한 작업 정보를 가져옴
-                    
-                    # 실패한 작업의 i, j 인덱스 추출 (예: 'worker1 failed task for C[2, 3]')
-                    i, j = map(int, failed_task_info.split("C[")[1].rstrip(']').split(', '))
-                    
-                    # 실패한 작업의 행렬 데이터를 다시 준비
-                    A_row = self.A[i, :].tolist()
-                    B_col = self.B[:, j].tolist()
-                    
-                    # 작업 데이터를 다시 구성
-                    task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
-
-                # 실패한 작업을 우선적으로 분배
+                    task_data = self.task_queue.get()
                 for worker_socket in self.worker_sockets:
-                    worker_socket.send(task_data.encode('utf-8'))  # 재구성한 작업 데이터를 전송
-                    print(f"Resent failed task to {self.worker_ids[worker_socket]} for C[{i}, {j}]")
-                    break  # 한 번에 하나의 실패 작업만 분배 후 다시 대기
-            else:
-                # 실패한 작업이 없으면 일반 작업 큐에서 작업 분배
-                if not self.task_queue.empty():
-                    with self.lock:
-                        task_data = self.task_queue.get()
-                    for worker_socket in self.worker_sockets:
-                        worker_socket.send(task_data.encode('utf-8'))  # 일반 작업 데이터를 전송
-                        print(f"Sent task to {self.worker_ids[worker_socket]}")
-            time.sleep(1)  # 분배 주기 조절
+                    worker_socket.send(task_data.encode('utf-8'))  # 일반 작업 데이터를 전송
+                    print(f"Sent task to {self.worker_ids[worker_socket]}")
+        time.sleep(1)  # 분배 주기 조절
 
+   
     def receive_results(self, worker_socket):
         # 각 Worker Node로부터 결과 수신 및 재할당 처리
         try:
