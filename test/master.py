@@ -32,17 +32,20 @@ class MasterNode:
         worker_id = f"worker{self.connected_workers}"
         self.worker_ids[client_socket] = worker_id
         self.worker_sockets.append(client_socket)
-        print(f"{worker_id} connected from {address}")
+        print(f"{worker_id}연결, {address}")
 
-        # 모든 Worker Node가 연결될 때까지 대기
+        # Worker에게 ID를 명시적으로 전송
+        client_socket.sendall(worker_id.encode('utf-8'))
+
+        # 4개 Worker Node가 연결될 때까지 대기
         while True:
             if self.connected_workers == 4:
-                print("All 4 Worker Nodes are connected. Distributing tasks...")
+                print("Worker Node 4개 연결, 작업 분배...")
                 self.distribute_config()
                 break
 
     def add_tasks_to_queue(self):
-        # 모든 작업을 작업 큐에 추가
+        # 모든 작업을 task_queue에 추가
         for i in range(1000):
             for j in range(1000):
                 A_row = self.A[i, :].tolist()
@@ -60,39 +63,30 @@ class MasterNode:
         # 작업 분배를 위한 스레드 시작
         distribution_thread = threading.Thread(target=self.distribute_tasks)
         distribution_thread.start()
-
     
     def distribute_tasks(self):
         while True:
             # 먼저 실패한 작업이 있는지 확인
             if not self.failed_queue.empty():
                 with self.lock:
-                    failed_task_info = self.failed_queue.get()  # 실패한 작업 정보를 가져옴
-                    
-                    # 실패한 작업의 i, j 인덱스 추출 (예: 'worker1 failed task for C[2, 3]')
+                    failed_task_info = self.failed_queue.get()
                     i, j = map(int, failed_task_info.split("C[")[1].rstrip(']').split(', '))
-                    
-                    # 실패한 작업의 행렬 데이터를 다시 준비
                     A_row = self.A[i, :].tolist()
                     B_col = self.B[:, j].tolist()
-                    
-                    # 작업 데이터를 다시 구성
                     task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
 
-                # 실패한 작업을 우선적으로 분배
                 for worker_socket in self.worker_sockets:
-                    worker_socket.send(task_data.encode('utf-8'))  # 재구성한 작업 데이터를 전송
+                    worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
                     print(f"Resent failed task to {self.worker_ids[worker_socket]} for C[{i}, {j}]")
-                    break  # 한 번에 하나의 실패 작업만 분배 후 다시 대기
+                    break
             else:
-                # 실패한 작업이 없으면 일반 작업 큐에서 작업 분배
                 if not self.task_queue.empty():
                     with self.lock:
                         task_data = self.task_queue.get()
                     for worker_socket in self.worker_sockets:
-                        worker_socket.send(task_data.encode('utf-8'))  # 일반 작업 데이터를 전송
+                        worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
                         print(f"Sent task to {self.worker_ids[worker_socket]}")
-            time.sleep(1)  # 분배 주기 조절
+            time.sleep(1)
 
    
     def receive_results(self, worker_socket):
@@ -103,16 +97,21 @@ class MasterNode:
                 if result:
                     if "failed" in result:
                         # 작업 실패 시 재할당
-                        print(f"Received failure from {self.worker_ids[worker_socket]}: {result}")
-                        task_data = result.split("failed task for ")[1]
+                        task_data = result.split("failed task for C[")[1].split(']')[0]  # C[i, j]에서 i, j만 추출
+                        i, j = task_data.split(', ')
+                        print(f"작업실패: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
                         
                         with self.lock:  # 작업 큐에 실패한 작업을 추가할 때 뮤텍스 잠금
-                            self.failed_queue.put(task_data)  # 실패한 작업을 실패 큐에 추가
+                            self.failed_queue.put(f"C[{i}, {j}]")  # 실패한 작업을 실패 큐에 추가
                     else:
-                        print(f"Received result from {self.worker_ids[worker_socket]}: {result}")
+                        # 성공한 경우 성공한 행렬 인덱스만 출력
+                        task_data = result.split("C[")[1].split(']')[0]  # C[i, j]에서 i, j만 추출
+                        i, j = task_data.split(', ')
+                        print(f"작업성공: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
                 time.sleep(1)  # 통신 지연 시뮬레이션
         except Exception as e:
-            print(f"Error receiving result from {self.worker_ids[worker_socket]}: {e}")
+            print(f"오류!: {self.worker_ids[worker_socket]} / {e}")
+
 
     def run(self):
         # 소켓 설정
@@ -120,7 +119,7 @@ class MasterNode:
         server_socket.bind((self.host, self.port))
         server_socket.listen(5)
 
-        print(f"Master Node started on {self.host}:{self.port}")
+        print(f"Master Node 시작 {self.host}:{self.port}")
 
         # Worker Node의 접속을 기다림
         while self.connected_workers < 4:
@@ -131,8 +130,6 @@ class MasterNode:
         # 작업 추가를 위한 스레드 시작
         task_addition_thread = threading.Thread(target=self.add_tasks_to_queue)
         task_addition_thread.start()
-
-        print("All 4 Worker Nodes are connected. Proceeding with task distribution...")
 
 # Google Cloud VM에서 실행될 Master Node
 if __name__ == "__main__":
