@@ -77,9 +77,17 @@ class MasterNode:
                 if not self.task_queue.empty():
                     with self.lock: # 작업 큐에서 꺼낼 때 뮤텍스 잠금
                         task_data = self.task_queue.get()
+
+                    # 작업 데이터와 인덱스 출력
+                    task = json.loads(task_data)
+                    i, j = task['i'], task['j']
+                    print(f"Distributing task C[{i}, {j}]")
+
+                    # 각 worker node에 작업 전송
                     for worker_socket in self.worker_sockets:
                         worker_socket.send(task_data.encode('utf-8'))
-                        print(f"Sent task to {self.worker_ids[worker_socket]}")
+                        # print(f"Sent task to {self.worker_ids[worker_socket]}")
+                        print(f"Sent task C[{i}, {j}] to {self.worker_ids[worker_socket]}")
             time.sleep(1) # 분배 주기 조절
 
     def receive_results(self, worker_socket):

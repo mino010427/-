@@ -44,7 +44,8 @@ class WorkerNode:
                     # 큐가 가득 찬 경우 작업 실패 처리
                     try:
                         self.task_queue.put(task_data, timeout=1)  # 큐에 작업을 추가
-                        print(f"{self.worker_id} received task")
+                        # print(f"{self.worker_id} received task")
+                        print(f"{self.worker_id} received task: {task_data[:50]}...")  # 로그 추가
                     except Full:
                         print(f"{self.worker_id}'s queue is full. Task failed.")
                         self.failure_count += 1
@@ -61,7 +62,8 @@ class WorkerNode:
 
                 # json으로 전달된 데이터를 역직렬화하여 처리
                 task = json.loads(task_data)
-                i, j, A_row, B_col = task['i'], task['j'], task['A_row'], task['B_col']
+                # i, j, A_row, B_col = task['i'], task['j'], task['A_row'], task['B_col']
+                i, j = task['i'], task['j']
 
                 print(f"{self.worker_id} is processing task for C[{i}, {j}]")
 
@@ -71,7 +73,8 @@ class WorkerNode:
 
                     # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
                     if random.random() < 0.8:
-                        result = sum(a * b for a, b in zip(A_row, B_col))
+                        # result = sum(a * b for a, b in zip(A_row, B_col))
+                        result = sum(a * b for a, b in zip(task['A_row'], task['B_col']))
                         self.client_socket.sendall(f"{self.worker_id} result: C[{i}, {j}] = {result}".encode('utf-8'))
                         self.success_count += 1
                     else:
