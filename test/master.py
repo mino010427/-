@@ -77,7 +77,7 @@ class MasterNode:
 
                 for worker_socket in self.worker_sockets:
                     worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
-                    print(f"Resent failed task to {self.worker_ids[worker_socket]} for C[{i}, {j}]")
+                    print(f"작업실패: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
                     break
             else:
                 if not self.task_queue.empty():
@@ -85,7 +85,7 @@ class MasterNode:
                         task_data = self.task_queue.get()
                     for worker_socket in self.worker_sockets:
                         worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
-                        print(f"Sent task to {self.worker_ids[worker_socket]}")
+                        print(f"작업전송: {self.worker_ids[worker_socket]}")
             time.sleep(1)
 
    
