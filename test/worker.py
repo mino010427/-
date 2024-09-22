@@ -43,7 +43,7 @@ class WorkerNode:
                     if "<END>" in buffer:  # 구분자 확인
                         complete_task = buffer.split("<END>")[0]  # 구분자를 기준으로 작업 분리
                         buffer = buffer.split("<END>")[1]  # 나머지 데이터는 버퍼에 저장
-
+                        
                         # 큐가 가득 찬 경우 작업 실패 처리
                         try:
                             self.task_queue.put(complete_task, timeout=1)  # 큐에 작업을 추가
