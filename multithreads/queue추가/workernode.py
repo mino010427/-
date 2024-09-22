@@ -1,6 +1,6 @@
 import socket
 import random
-import numpy as np
+import json
 import time
 from queue import Queue, Full, Empty
 import threading
@@ -85,7 +85,7 @@ class WorkerNode:
         # Master Node로부터 작업 수신
         while True:
             try:
-                task_data = self.client_socket.recv(1024).decode()
+                task_data = self.client_socket.recv(4096).decode()  # 버퍼 크기를 늘림
                 if task_data:
                     # 큐가 가득 찬 경우 다른 Worker Node에게 작업을 넘김
                     try:
@@ -96,7 +96,7 @@ class WorkerNode:
                         if not self.send_task_to_other_worker(task_data):
                             print(f"{self.worker_id} failed to pass task. Task failed.")
                             self.failure_count += 1
-                            self.client_socket.sendall(f"{self.worker_id} failed to receive task".encode())
+                            self.client_socket.sendall(f"{self.worker_id} failed task for {task_data}".encode())
             except Exception as e:
                 print(f"Error receiving task: {e}")
                 break
@@ -106,7 +106,12 @@ class WorkerNode:
         while True:
             if not self.task_queue.empty():
                 task_data = self.task_queue.get()  # 작업 큐에서 작업 꺼내기
-                i, j, A_row, B_col = eval(task_data)
+                task_info = json.loads(task_data)  # JSON으로 변환된 데이터를 파싱
+                i = task_info["i"]
+                j = task_info["j"]
+                A_row = task_info["A_row"]
+                B_col = task_info["B_col"]
+
                 print(f"{self.worker_id} is processing task for C[{i}, {j}]")
 
                 try:
@@ -144,5 +149,5 @@ if __name__ == "__main__":
     peer_addresses = [tuple(peer.split(':')) for peer in peers]
     peer_addresses = [(ip, int(port)) for ip, port in peer_addresses]
 
-    worker_node = WorkerNode(master_host="34.68.170.234", master_port=9999, worker_port=worker_port, worker_peers=peer_addresses)  # Google Cloud VM 외부 IP 주소
+    worker_node = WorkerNode(master_host="34.68.170.234", master_port=9999, worker_port=worker_port, worker_peers=peer_addresses)
     worker_node.run()

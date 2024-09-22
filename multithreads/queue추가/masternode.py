@@ -3,6 +3,7 @@ import threading
 import numpy as np
 import time
 from queue import Queue
+import json
 
 # 가상의 System Clock 정의
 class SystemClock:
@@ -48,8 +49,14 @@ class MasterNode:
                 for j in range(1000):
                     A_row = self.A[i, :]
                     B_col = self.B[:, j]
-                    task_data = str((i, j, A_row.tolist(), B_col.tolist()))  # 데이터를 문자열로 변환
-                    worker_socket.send(task_data.encode('utf-8'))
+                    # JSON 형식으로 데이터를 변환
+                    task_data = json.dumps({
+                        "i": i,
+                        "j": j,
+                        "A_row": A_row.tolist(),
+                        "B_col": B_col.tolist()
+                    })
+                    worker_socket.send(task_data.encode('utf-8'))  # 작업을 Worker Node에게 전송
                     print(f"Sent task for C[{i}, {j}] to {self.worker_ids[worker_socket]}")
 
         # Worker Node로부터 작업 결과 수신
@@ -60,32 +67,39 @@ class MasterNode:
         # 각 Worker Node로부터 결과 수신 및 재할당 처리
         try:
             while True:
-                result = worker_socket.recv(1024).decode()
+                result = worker_socket.recv(4096).decode()  # 버퍼 크기를 늘림
                 if result:
                     if "failed" in result:
                         # 작업 실패 시 재할당
-                        print(f"Received failure from {self.worker_ids[worker_socket]}: {result}")
+                        print(f"[{self.system_clock.get_elapsed_time():.2f}] Failure from {self.worker_ids[worker_socket]}: {result}")
                         task_data = result.split("failed task for ")[1]
                         self.task_queue.put(task_data)  # 실패한 작업을 큐에 추가
                         self.reassign_failed_task()
                     else:
-                        print(f"Received result from {self.worker_ids[worker_socket]}: {result}")
+                        print(f"[{self.system_clock.get_elapsed_time():.2f}] Result from {self.worker_ids[worker_socket]}: {result}")
                 time.sleep(1)  # 통신 지연 시뮬레이션
         except Exception as e:
             print(f"Error receiving result from {self.worker_ids[worker_socket]}: {e}")
 
     def reassign_failed_task(self):
         # 작업 재할당
+        retry_limit = 3  # 재시도 제한
         while not self.task_queue.empty():
             task_data = self.task_queue.get()
-            # 재할당할 Worker Node 찾기
-            for worker_socket in self.worker_sockets:
-                try:
-                    worker_socket.send(task_data.encode('utf-8'))
-                    print(f"Reassigned task: {task_data} to {self.worker_ids[worker_socket]}")
-                    break
-                except Exception as e:
-                    print(f"Error reassigning task: {e}")
+            retry_count = 0
+            success = False
+            while retry_count < retry_limit and not success:
+                for worker_socket in self.worker_sockets:
+                    try:
+                        worker_socket.send(task_data.encode('utf-8'))
+                        print(f"Reassigned task: {task_data} to {self.worker_ids[worker_socket]}")
+                        success = True
+                        break
+                    except Exception as e:
+                        print(f"Error reassigning task: {e}")
+                        retry_count += 1
+            if not success:
+                print(f"Task {task_data} failed after {retry_limit} attempts")
 
     def run(self):
         # 소켓 설정

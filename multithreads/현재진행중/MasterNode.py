@@ -35,11 +35,9 @@ class MasterNode:
         print(f"{worker_id} connected from {address}")
 
         # 모든 Worker Node가 연결될 때까지 대기
-        while True:
-            if self.connected_workers == 4:
-                print("All 4 Worker Nodes are connected. Distributing tasks...")
-                self.distribute_config()
-                break
+        if self.connected_workers == 4:
+            print("All 4 Worker Nodes are connected. Distributing tasks...")
+            self.distribute_config()
 
     def add_tasks_to_queue(self):
         # 모든 작업을 작업 큐에 추가
@@ -63,32 +61,27 @@ class MasterNode:
 
     def distribute_tasks(self):
         while True:
-            # 먼저 실패한 작업이 있는지 확인
             if not self.failed_queue.empty():
                 with self.lock:
                     failed_task_data = self.failed_queue.get()
-                # 실패한 작업을 우선적으로 분배
+                # 실패한 작업을 모든 Worker Node에 순차적으로 분배
                 for worker_socket in self.worker_sockets:
                     worker_socket.send(failed_task_data.encode('utf-8'))
                     print(f"Resent failed task to {self.worker_ids[worker_socket]}")
-                    break  # 한 번에 하나의 실패 작업만 분배 후 다시 대기
-            else: # Worker Node에 동적으로 작업을 분배
+            else:
                 # 실패한 작업이 없으면 일반 작업 큐에서 작업 분배
                 if not self.task_queue.empty():
-                    with self.lock: # 작업 큐에서 꺼낼 때 뮤텍스 잠금
-                        task_data = self.task_queue.get()
-
-                    # 작업 데이터와 인덱스 출력
-                    task = json.loads(task_data)
-                    i, j = task['i'], task['j']
-                    print(f"Distributing task C[{i}, {j}]")
-
-                    # 각 worker node에 작업 전송
+                    # 각 Worker Node에게 고유한 작업을 순차적으로 분배
                     for worker_socket in self.worker_sockets:
+                        with self.lock:
+                            task_data = self.task_queue.get()
+
+                        task = json.loads(task_data)
+                        i, j = task['i'], task['j']
+                        print(f"Distributing task C[{i}, {j}] to {self.worker_ids[worker_socket]}")
                         worker_socket.send(task_data.encode('utf-8'))
-                        # print(f"Sent task to {self.worker_ids[worker_socket]}")
-                        print(f"Sent task C[{i}, {j}] to {self.worker_ids[worker_socket]}")
-            time.sleep(1) # 분배 주기 조절
+
+            time.sleep(0.5)  # 작업 분배 주기 조절
 
     def receive_results(self, worker_socket):
         # 각 Worker Node로부터 결과 수신 및 재할당 처리
@@ -105,7 +98,7 @@ class MasterNode:
                             self.failed_queue.put(task_data)  # 실패한 작업을 실패 큐에 추가
                     else:
                         print(f"Received result from {self.worker_ids[worker_socket]}: {result}")
-                time.sleep(1)  # 통신 지연 시뮬레이션
+                time.sleep(0.5)  # 통신 지연 시뮬레이션
         except Exception as e:
             print(f"Error receiving result from {self.worker_ids[worker_socket]}: {e}")
 

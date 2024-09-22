@@ -69,7 +69,7 @@ class WorkerNode:
 
                 try:
                     # 작업 처리 (랜덤하게 1~3초 소요되는 작업 시뮬레이션)
-                    time.sleep(random.uniform(1, 3))
+                    # time.sleep(random.uniform(1, 3))
 
                     # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
                     if random.random() < 0.8:
