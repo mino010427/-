@@ -20,6 +20,7 @@ class MasterNode:
         self.worker_sockets = []
         self.connected_workers = 0  # 접속한 Worker Node 수
         self.worker_ids = {}  # Worker ID 매핑
+        self.worker_status = {} # 각 Worker Node의 큐 상태를 저장할 딕셔너리
         self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
         self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
         self.task_queue = Queue()  # 작업 큐
@@ -32,6 +33,7 @@ class MasterNode:
         worker_id = f"worker{self.connected_workers}"
         self.worker_ids[client_socket] = worker_id
         self.worker_sockets.append(client_socket)
+        self.worker_status[worker_id] = { 'queue_used': 0, 'queue_remaining': 10 }  # 초기 큐 상태 저장
         print(f"{worker_id}연결, {address}")
 
         # Worker에게 ID를 명시적으로 전송
