@@ -89,6 +89,22 @@ class MasterNode:
                             print(f"작업전송: {self.worker_ids[worker_socket]}")
             time.sleep(1)
 
+    def receive_worker_status(self, client_socket, worker_id):
+    # Worker Node로부터 주기적으로 큐 상태를 수신
+        while True:
+            try:
+                status_data = client_socket.recv(1024).decode()  # Worker Node로부터 상태 수신
+                if status_data:
+                    status = json.loads(status_data)  # 상태 데이터를 JSON으로 디코딩
+                    self.worker_status[worker_id] = {
+                        'queue_used': status['queue_used'],          # 큐에 사용 중인 공간
+                        'queue_remaining': status['queue_remaining']  # 큐에 남은 공간
+                    }
+                    # 상태 출력
+                    print(f"Worker {worker_id} 상태 - 사용 중: {status['queue_used']}, 남은 공간: {status['queue_remaining']}")
+            except Exception as e:
+                print(f"Worker {worker_id} 상태 수신 오류: {e}")
+                break
    
     def receive_results(self, worker_socket):
         # 각 Worker Node로부터 결과 수신 및 재할당 처리
