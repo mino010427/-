@@ -66,7 +66,7 @@ class MasterNode:
     
     def distribute_tasks(self):
         while True:
-            if not self.failed_queue.empty():  # 실패한 작업이 있다면 최우선으로 처리
+            if not self.failed_queue.empty():  # 실패한 작업이 있으면 먼저 처리
                 with self.lock:
                     failed_task_info = self.failed_queue.get()
                     i, j = map(int, failed_task_info.split("C[")[1].rstrip(']').split(', '))
@@ -74,23 +74,24 @@ class MasterNode:
                     B_col = self.B[:, j].tolist()
                     task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
 
-                # 여기서 각 worker의 큐 상태를 확인한 후, 큐가 꽉 차지 않은 worker로만 작업을 보냄
+                # 하나의 Worker에게만 작업을 보냄
                 for worker_socket in self.worker_sockets:
-                    if self.get_worker_queue_status(worker_socket) < 10:  # 큐가 꽉 차지 않았는지 확인
-                        worker_socket.send((task_data + "<END>").encode('utf-8'))
+                    if self.get_worker_queue_status(worker_socket) < 10:  # Worker의 큐 상태 확인
+                        worker_socket.send((task_data + "<END>").encode('utf-8'))  # 하나의 Worker에게만 작업 할당
                         print(f"작업실패 재할당: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
                         break
             else:
-                if not self.task_queue.empty():
+                if not self.task_queue.empty():  # 새로운 작업을 처리
                     with self.lock:
                         task_data = self.task_queue.get()
 
-                    # 마찬가지로 worker의 큐 상태를 고려하여 작업을 전송
+                    # 작업을 하나의 Worker에게만 순차적으로 전송
                     for worker_socket in self.worker_sockets:
                         if self.get_worker_queue_status(worker_socket) < 10:
                             worker_socket.send((task_data + "<END>").encode('utf-8'))
                             print(f"작업전송: {self.worker_ids[worker_socket]}")
-            time.sleep(1)
+                            break  # 한 번에 하나의 Worker에게만 보냄
+            time.sleep(1)  # Worker가 작업을 받을 시간을 줌
 
     # 각 worker의 작업 큐 상태를 받는 메서드
     def get_worker_queue_status(self, worker_socket):
