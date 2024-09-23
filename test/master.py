@@ -93,7 +93,7 @@ class MasterNode:
     # Worker Node로부터 주기적으로 큐 상태를 수신
         while True:
             try:
-                status_data = client_socket.recv(1024).decode()  # Worker Node로부터 상태 수신
+                status_data = client_socket.recv(1024).deco56yhde()  # Worker Node로부터 상태 수신
                 if status_data:
                     status = json.loads(status_data)  # 상태 데이터를 JSON으로 디코딩
                     self.worker_status[worker_id] = {
