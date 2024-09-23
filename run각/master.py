@@ -115,7 +115,7 @@ class MasterNode:
                         task_data = result.split("C[")[1].split(']')[0]  # C[i, j]에서 i, j만 추출
                         i, j = task_data.split(', ')
                         print(f"성공: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
-                #time.sleep(1)  # 통신 지연 시뮬레이션
+                time.sleep(1)  # 통신 지연 시뮬레이션
         except Exception as e:
             print(f"오류!: {self.worker_ids[worker_socket]} / {e}")
 
