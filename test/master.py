@@ -82,10 +82,11 @@ class MasterNode:
             else:
                 if not self.task_queue.empty():
                     with self.lock:
-                        task_data = self.task_queue.get()
-                    for worker_socket in self.worker_sockets:
-                        worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
-                        print(f"작업전송: {self.worker_ids[worker_socket]}")
+                        
+                        for worker_socket in self.worker_sockets:
+                            task_data = self.task_queue.get()
+                            worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
+                            print(f"작업전송: {self.worker_ids[worker_socket]}")
             time.sleep(1)
 
    
