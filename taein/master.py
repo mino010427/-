@@ -20,6 +20,7 @@ class MasterNode:
         self.worker_sockets = []
         self.connected_workers = 0  # 접속한 Worker Node 수
         self.worker_ids = {}  # Worker ID 매핑
+        self.worker_status = {} # 각 Worker Node의 큐 상태를 저장할 딕셔너리
         self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
         self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
         self.task_queue = Queue()  # 작업 큐
@@ -32,6 +33,7 @@ class MasterNode:
         worker_id = f"worker{self.connected_workers}"
         self.worker_ids[client_socket] = worker_id
         self.worker_sockets.append(client_socket)
+        self.worker_status[worker_id] = { 'queue_used': 0, 'queue_remaining': 10 }  # 초기 큐 상태 저장
         print(f"{worker_id}연결, {address}")
 
         # Worker에게 ID를 명시적으로 전송
@@ -43,6 +45,51 @@ class MasterNode:
                 print("Worker Node 4개 연결, 작업 분배...")
                 self.distribute_config()
                 break
+
+    def distribute_tasks(self):
+        while True:
+            # 먼저 실패한 작업이 있는지 확인
+            if not self.failed_queue.empty():
+                with self.lock:
+                    failed_task_info = self.failed_queue.get()
+                    i, j = map(int, failed_task_info.split("C[")[1].rstrip(']').split(', '))
+                    A_row = self.A[i, :].tolist()
+                    B_col = self.B[:, j].tolist()
+                    task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
+
+                # Worker 노드가 모두 작업 큐가 가득 찼는지 확인
+                if self.worker_status_all_full():
+                    while self.worker_status_all_full():  # 큐가 가득 찼으면, 상태가 변할 때까지 대기
+                        time.sleep(0.1)
+                
+                # 가장 적합한 Worker에게 작업 전송
+                selected_worker_id = self.find_load_worker()  # 큐가 가장 여유로운 Worker 찾기
+                for worker_socket, worker_id in self.worker_ids.items():
+                    if worker_id == selected_worker_id:
+                        worker_socket.send((task_data + "<END>").encode('utf-8'))
+                        print(f"실패 작업 재전송: {worker_id} / C[{i}, {j}]")
+                        break
+
+            else:
+                if not self.task_queue.empty():
+                    with self.lock:
+                        task_data = self.task_queue.get()
+
+                    # Worker 노드가 모두 작업 큐가 가득 찼는지 확인
+                    if self.worker_status_all_full():
+                        while self.worker_status_all_full():  # 큐가 가득 찼으면, 상태가 변할 때까지 대기
+                            time.sleep(0.1)
+
+                    # 가장 적합한 Worker에게 작업 전송
+                    selected_worker_id = self.find_load_worker()  # 큐가 가장 여유로운 Worker 찾기
+                    for worker_socket, worker_id in self.worker_ids.items():
+                        if worker_id == selected_worker_id:
+                            worker_socket.send((task_data + "<END>").encode('utf-8'))
+                            print(f"작업 전송: {worker_id}")
+                            break
+
+            #time.sleep(1)
+
 
     def add_tasks_to_queue(self):
         # 모든 작업을 task_queue에 추가
@@ -59,35 +106,57 @@ class MasterNode:
         # 각 Worker Node가 작업을 수신할 수 있도록 스레드를 시작함
         for worker_socket in self.worker_sockets:
             threading.Thread(target=self.receive_results, args=(worker_socket,)).start()
+            threading.Thread(target=self.receive_worker_status, args=(worker_socket,)).start()
+
 
         # 작업 분배를 위한 스레드 시작
         distribution_thread = threading.Thread(target=self.distribute_tasks)
         distribution_thread.start()
-    
-    def distribute_tasks(self):
+
+    def find_load_worker(self):
+        max_remaining = -1  # 가장 큰 queue_remaining 값을 저장할 변수
+        selected_worker = None  # 선택된 Worker의 ID를 저장할 변수
+
+        # worker_status의 모든 worker를 확인
+        for worker_id, status in self.worker_status.items():
+            remaining = status['queue_remaining']
+
+            # 가장 큰 queue_remaining 값을 가진 worker를 선택
+            if remaining > max_remaining:
+                max_remaining = remaining
+                selected_worker = worker_id
+            # 동일한 queue_remaining 값이 있을 경우, Worker ID가 작은 것을 선택
+            elif remaining == max_remaining and worker_id < selected_worker:
+                selected_worker = worker_id
+
+        return selected_worker  # 가장 적합한 Worker의 ID 반환
+
+
+    def worker_status_all_full(self):
+        # worker_status의 모든 worker의 queue_remaining 값을 확인
+        for worker_id, status in self.worker_status.items():
+            if status['queue_remaining'] > 0:
+                return False  # 하나라도 남은 작업이 있으면 False 반환
+        return True  # 모든 worker의 queue_remaining이 0이면 True 반환
+
+
+
+    def receive_worker_status(self, client_socket, worker_id):
+    # Worker Node로부터 주기적으로 큐 상태를 수신
         while True:
-            # 먼저 실패한 작업이 있는지 확인
-            if not self.failed_queue.empty():
-                with self.lock:
-                    failed_task_info = self.failed_queue.get()
-                    i, j = map(int, failed_task_info.split("C[")[1].rstrip(']').split(', '))
-                    A_row = self.A[i, :].tolist()
-                    B_col = self.B[:, j].tolist()
-                    task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
-
-                for worker_socket in self.worker_sockets:
-                    worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
-                    print(f"작업실패: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
-                    break
-            else:
-                if not self.task_queue.empty():
-                    with self.lock:
-                        task_data = self.task_queue.get()
-                    for worker_socket in self.worker_sockets:
-                        worker_socket.send((task_data + "<END>").encode('utf-8'))  # 구분자 추가
-                        print(f"작업전송: {self.worker_ids[worker_socket]}")
-            time.sleep(1)
-
+            try:
+                status_data = client_socket.recv(1024).decode()  # Worker Node로부터 상태 수신
+                if status_data:
+                    status = json.loads(status_data)  # 상태 데이터를 JSON으로 디코딩
+                    self.worker_status[worker_id] = {
+                        'queue_used': status['queue_used'],          # 큐에 사용 중인 공간
+                        'queue_remaining': status['queue_remaining']  # 큐에 남은 공간
+                    }
+                    # 상태 출력
+                    print(f"Worker {worker_id} 상태 - 사용 중: {status['queue_used']}, 남은 공간: {status['queue_remaining']}")
+            except Exception as e:
+                print(f"Worker {worker_id} 상태 수신 오류: {e}")
+                break
    
     def receive_results(self, worker_socket):
         # 각 Worker Node로부터 결과 수신 및 재할당 처리

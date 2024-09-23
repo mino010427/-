@@ -21,12 +21,12 @@ class MasterNode:
         self.connected_workers = 0  # 접속한 Worker Node 수
         self.worker_ids = {}  # Worker ID 매핑
         self.worker_status_dictionary = {}  # Worker queue상태 딕셔너리
-        self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
-        self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
+        self.A = np.random.randint(1, 100, (10, 10))  # 10x10 행렬 A
+        self.B = np.random.randint(1, 100, (10, 10))  # 10x10 행렬 B
         self.task_queue = Queue()  # 작업 큐
         self.failed_queue = Queue()  # 실패한 작업 큐 추가
         self.lock = threading.Lock()  # 뮤텍스 추가
-        self.total_tasks = 1000 * 1000  # 총 작업 수
+        self.total_tasks = 10 * 10  # 총 작업 수
         self.completed_tasks = 0  # 완료된 작업 수
     
     def handle_worker(self, client_socket, address):
@@ -57,6 +57,51 @@ class MasterNode:
             except Exception as e:
                 print(f"Worker {worker_id} 상태 수신 오류: {e}")
                 break
+
+    def distribute_config(self):
+        # 각 Worker Node가 작업을 수신할 수 있도록 스레드를 시작함
+        for worker_socket in self.worker_sockets:
+            threading.Thread(target=self.receive_results, args=(worker_socket,)).start()
+
+        # 작업 분배를 위한 스레드 시작
+        distribution_thread = threading.Thread(target=self.distribute_tasks)
+        distribution_thread.start()
+
+    def add_tasks_to_queue(self):
+        # 모든 작업을 task_queue에 추가
+        for i in range(1000):
+            for j in range(1000):
+                A_row = self.A[i, :].tolist()
+                B_col = self.B[:, j].tolist()
+                task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
+                
+                with self.lock:  # 큐에 접근할 때 뮤텍스 잠금
+                    self.task_queue.put(task_data)
+
+    def receive_results(self, worker_socket):
+        # 각 Worker Node로부터 결과 수신 및 재할당 처리
+        try:
+            while True:
+                result = worker_socket.recv(1024).decode()
+                if result:
+                    if "failed" in result:
+                        # 작업 실패 시 재할당
+                        task_data = result.split("failed task for C[")[1].split(']')[0]  # C[i, j]에서 i, j만 추출
+                        i, j = task_data.split(', ')
+                        print(f"작업실패: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
+                        
+                        with self.lock:  # 작업 큐에 실패한 작업을 추가할 때 뮤텍스 잠금
+                            self.failed_queue.put(f"C[{i}, {j}]")  # 실패한 작업을 실패 큐에 추가
+                    else:
+                        # 성공한 경우 성공한 행렬 인덱스만 출력
+                        task_data = result.split("C[")[1].split(']')[0]  # C[i, j]에서 i, j만 추출
+                        i, j = task_data.split(', ')
+                        print(f"작업성공: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
+                time.sleep(1)  # 통신 지연 시뮬레이션
+        except Exception as e:
+            print(f"오류!: {self.worker_ids[worker_socket]} / {e}")
+
+
 
     def distribute_tasks(self):
         while True:
