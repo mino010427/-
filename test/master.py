@@ -23,6 +23,7 @@ class MasterNode:
         self.worker_status = {} # 각 Worker Node의 큐 상태를 저장할 딕셔너리
         self.A = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 A
         self.B = np.random.randint(1, 100, (1000, 1000))  # 1000x1000 행렬 B
+        # self.C = np.zeros((1000, 1000))  # 1000x1000 결과 행렬 C (처음엔 0으로 초기화)
         self.task_queue = Queue()  # 작업 큐
         self.failed_queue = Queue()  # 실패한 작업 큐 추가
         self.lock = threading.Lock()  # 뮤텍스 추가
@@ -95,7 +96,7 @@ class MasterNode:
     # Worker Node로부터 주기적으로 큐 상태를 수신
         while True:
             try:
-                status_data = client_socket.recv(1024).deco56yhde()  # Worker Node로부터 상태 수신
+                status_data = client_socket.recv(1024).decode()  # Worker Node로부터 상태 수신
                 if status_data:
                     status = json.loads(status_data)  # 상태 데이터를 JSON으로 디코딩
                     self.worker_status[worker_id] = {
@@ -149,6 +150,7 @@ class MasterNode:
         # 작업 추가를 위한 스레드 시작
         task_addition_thread = threading.Thread(target=self.add_tasks_to_queue)
         task_addition_thread.start()
+
 
 # Google Cloud VM에서 실행될 Master Node
 if __name__ == "__main__":
