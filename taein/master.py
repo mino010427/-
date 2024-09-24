@@ -84,7 +84,7 @@ class MasterNode:
                             print(f"작업 전송: {worker_id}")
                             break
 
-            time.sleep(1)
+            #time.sleep(1)
 
 
     def add_tasks_to_queue(self):
@@ -169,7 +169,7 @@ class MasterNode:
                         print(f"작업성공: {self.worker_ids[worker_socket]} / C[{i}, {j}]")
 
                         
-                time.sleep(1)  # 통신 지연 시뮬레이션
+                #time.sleep(1)  # 통신 지연 시뮬레이션
         except Exception as e:
             print(f"오류!: {self.worker_ids[worker_socket]} / {e}")
 

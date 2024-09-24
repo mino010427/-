@@ -82,33 +82,34 @@ class WorkerNode:
                 break
 
     def process_task(self):
-        if not self.task_queue.empty():
-            task_data = self.task_queue.get()  # 작업 큐에서 작업 꺼내기
+        while True:
+            if not self.task_queue.empty():
+                task_data = self.task_queue.get()  # 작업 큐에서 작업 꺼내기
 
-            # json으로 전달된 데이터를 역직렬화하여 처리
-            task = json.loads(task_data)
-            i, j, A_row, B_col = task['i'], task['j'], task['A_row'], task['B_col']
+                # json으로 전달된 데이터를 역직렬화하여 처리
+                task = json.loads(task_data)
+                i, j, A_row, B_col = task['i'], task['j'], task['A_row'], task['B_col']
 
-            print(f"작업 처리: {self.worker_id} / C[{i}, {j}]")
+                print(f"작업 처리: {self.worker_id} / C[{i}, {j}]")
 
-            try:
-                # 작업 처리 (랜덤하게 1~3초 소요되는 작업 시뮬레이션)
-               # time.sleep(random.uniform(1, 3))
+                try:
+                    # 작업 처리 (랜덤하게 1~3초 소요되는 작업 시뮬레이션)
+                    #time.sleep(random.uniform(1, 3))
 
-                # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
-                if random.random() < 0.8:
-                    # 성공 시: 성공 메시지 전송
-                    self.client_socket.sendall(f"{self.worker_id} 성공: C[{i}, {j}]".encode('utf-8'))
-                    self.success_count += 1
+                    # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
+                    if random.random() < 0.99:
+                        # 성공 시: 성공 메시지 전송
+                        self.client_socket.sendall(f"{self.worker_id} 성공: C[{i}, {j}]".encode('utf-8'))
+                        self.success_count += 1
+                        self.report_queue_status()
+                    else:
+                        raise Exception("Random failure occurred")
+                except Exception as e:
+                    # 작업 실패 시 Master Node에 실패 메시지 전송 (작업 재할당을 위해)
+                    print(f"{self.worker_id} 작업 실패: C[{i}, {j}], {e}")
+                    self.client_socket.sendall(f"{self.worker_id} failed task for C[{i}, {j}]".encode('utf-8'))
+                    self.failure_count += 1
                     self.report_queue_status()
-                else:
-                    raise Exception("Random failure occurred")
-            except Exception as e:
-                # 작업 실패 시 Master Node에 실패 메시지 전송 (작업 재할당을 위해)
-                print(f"{self.worker_id} 작업 실패: C[{i}, {j}], {e}")
-                self.client_socket.sendall(f"{self.worker_id} failed task for C[{i}, {j}]".encode('utf-8'))
-                self.failure_count += 1
-                self.report_queue_status()
 
     def run(self):
         # Master Node와 연결
@@ -116,6 +117,8 @@ class WorkerNode:
 
         # 작업 수신 및 처리 스레드를 생성
         threading.Thread(target=self.receive_task).start()  # 작업 수신 스레드
+        
+        
         threading.Thread(target=self.process_task).start()  # 작업 처리 스레드``
 
 # Worker Node 실행
