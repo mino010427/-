@@ -22,6 +22,8 @@ class WorkerNode:
         self.success_count = 0
         self.failure_count = 0
 
+
+
     def connect_to_master(self):
         # Master Node에 연결
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

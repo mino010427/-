@@ -4,6 +4,8 @@ import numpy as np
 import time
 from queue import Queue
 import json
+#import debugpy
+#debugpy.debug_this_thread()
 
 class SystemClock:
     def __init__(self):
@@ -54,9 +56,9 @@ class MasterNode:
                     task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
 
                 # Worker 노드가 모두 작업 큐가 가득 찼는지 확인
-                if self.worker_status_all_full():
-                    while self.worker_status_all_full():  # 큐가 가득 찼으면, 상태가 변할 때까지 대기
-                        time.sleep(0.1)
+               
+                while self.worker_status_all_full():  # 큐가 가득 찼으면, 상태가 변할 때까지 대기
+                    time.sleep(1)
                 
                 # 가장 적합한 Worker에게 작업 전송
                 selected_worker_id = self.find_load_worker()  # 큐가 가장 여유로운 Worker 찾기
@@ -131,7 +133,7 @@ class MasterNode:
 
     def receive_worker_status(self, client_socket, worker_id):
     # Worker Node로부터 주기적으로 큐 상태를 수신
-        
+        while True:
             try:
                 status_data = client_socket.recv(1024).decode()  # Worker Node로부터 상태 수신
                 if status_data:
@@ -188,7 +190,8 @@ class MasterNode:
             #작업 결과를 받기 위한 스레드 시작
             threading.Thread(target=self.receive_results, args=(client_socket,)).start()
             #워커의 상태를 받기 위한 스레드 시작
-            threading.Thread(target=self.receive_worker_status, args=(client_socket,)).start()
+            threading.Thread(target=self.receive_worker_status, args=(client_socket,self.worker_ids[client_socket])).start()
+            
 
 
         # 작업 추가를 위한 스레드 시작
