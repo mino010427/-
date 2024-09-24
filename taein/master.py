@@ -188,7 +188,7 @@ class MasterNode:
             self.handle_worker(client_socket, address)
             
             #작업 결과를 받기 위한 스레드 시작
-            threading.Thread(target=self.receive_results, args=(client_socket)).start()
+            threading.Thread(target=self.receive_results, args=(client_socket,)).start()
             
 
 
