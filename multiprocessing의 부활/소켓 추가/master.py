@@ -51,20 +51,6 @@ class MasterNode:
                 task_data = {'i': i, 'j': j, 'A_row': self.A[i, :].tolist(), 'B_col': self.B[:, j].tolist()}
                 self.task_queue.put(json.dumps(task_data))
 
-    # def distribute_tasks(self):
-    #     """작업을 Worker에게 분배"""
-    #     while not self.task_queue.empty() or not self.failed_queue.empty():
-    #         for i, queue in enumerate(self.worker_queues):
-    #             # **실패한 작업을 우선적으로 처리**
-    #             if not self.failed_queue.empty() and not queue.full():
-    #                 failed_task = self.failed_queue.get()  # 실패한 작업을 재분배
-    #                 print(f"Worker {i+1} - 재분배 실패 작업: C[{task['i']}, {task['j']}]")  # 인덱스만 출력
-    #                 queue.put(failed_task)
-    #             elif not self.task_queue.empty() and not queue.full():
-    #                 task_data = self.task_queue.get()  # 새 작업 분배
-    #                 print(f"Worker {i+1} - 새 작업 분배")
-    #                 queue.put(task_data)
-
     def distribute_tasks(self):
         """작업을 Worker에게 분배"""
         retry_limit = 3  # 실패한 작업에 대한 재시도 횟수 제한
@@ -94,28 +80,6 @@ class MasterNode:
             if all(queue.full() for queue in self.worker_queues):
                 print("모든 Worker의 큐가 가득 찼습니다. 대기 중...")
                 time.sleep(1)  # 잠시 대기
-
-    
-
-    # def receive_results(self):
-    #     """Worker Node로부터 작업 결과를 수신"""
-    #     for pipe in self.parent_pipes:
-    #         if pipe.poll():  # 결과가 도착하면 처리
-    #             try:
-    #                 result = pipe.recv()
-    #                 result_data = json.loads(result)
-
-    #                 i, j = result_data['i'], result_data['j']
-    #                 if 'failed' in result_data:
-    #                     print(f"작업 실패: C[{i}, {j}]")
-    #                     self.failed_queue.put(result)  # 실패한 작업을 즉시 재할당
-    #                 else:
-    #                     result_value = result_data['result']
-    #                     self.C[i, j] = result_value  # 결과 행렬 업데이트
-    #                     print(f"작업 성공: C[{i}, {j}] = {result_value}")
-    #             except BrokenPipeError:
-    #                 print(f"파이프가 닫혔습니다. 통신 오류 발생")
-    #                 continue
 
     def receive_results(self):
         """Worker Node로부터 작업 결과를 수신"""
