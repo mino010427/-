@@ -22,8 +22,6 @@ class WorkerNode:
         self.success_count = 0
         self.failure_count = 0
 
-
-
     def connect_to_master(self):
         # Master Node에 연결
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -31,7 +29,14 @@ class WorkerNode:
         print(f"Master Node와 연결 {self.master_host}:{self.master_port}")
 
         # Worker ID 할당받기 (Master Node에서 할당)
-        self.worker_id = self.client_socket.recv(1024).decode()
+        self.worker_id = ""
+        buffer = ""  # 데이터 버퍼
+        while True:
+            data = self.client_socket.recv(1024).decode()
+            buffer += data
+            if "<END>" in buffer:
+                self.worker_id = buffer.split("<END>")[0]  # 구분자를 기준으로 Worker ID 할당
+                break
         print(f"Worker ID 할당: {self.worker_id}")
 
     def report_queue_status(self):
@@ -47,12 +52,10 @@ class WorkerNode:
                 'queue_used': queue_size,          # 현재 큐에 있는 작업 개수
                 'queue_remaining': queue_remaining  # 남은 큐 공간
             }
-            self.client_socket.sendall(json.dumps(queue_status).encode('utf-8'))
+            self.client_socket.sendall((json.dumps(queue_status) + "<END>").encode('utf-8'))
             print(f"{self.worker_id} 큐 상태 보고 - 사용 중: {queue_size}, 남은 공간: {queue_remaining}")
         except Exception as e:
             print(f"큐 상태 보고 중 오류 발생: {e}")
-
-
 
     def receive_task(self):
         buffer = ""  # 데이터 버퍼
@@ -76,7 +79,7 @@ class WorkerNode:
                             print(f"작업 실패: {self.worker_id}의 큐가 가득 참")
                             self.failure_count += 1
                             # 큐가 가득 찼을 때는 실패 메시지를 보내지 않음 (작업 처리가 불가능)
-                            self.client_socket.sendall(f"{self.worker_id} failed to receive task".encode('utf-8'))
+                            self.client_socket.sendall(f"{self.worker_id} failed to receive task<END>".encode('utf-8'))
                             self.report_queue_status()
             except Exception as e:
                 print(f"Error receiving task: {e}")
@@ -95,12 +98,12 @@ class WorkerNode:
 
                 try:
                     # 작업 처리 (랜덤하게 1~3초 소요되는 작업 시뮬레이션)
-                    #time.sleep(random.uniform(1, 3))
+                    time.sleep(random.uniform(1, 3))
 
                     # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
                     if random.random() < 0.8:
                         # 성공 시: 성공 메시지 전송
-                        self.client_socket.sendall(f"{self.worker_id} 성공: C[{i}, {j}]".encode('utf-8'))
+                        self.client_socket.sendall(f"{self.worker_id} 성공: C[{i}, {j}]<END>".encode('utf-8'))
                         self.success_count += 1
                         self.report_queue_status()
                     else:
@@ -108,7 +111,7 @@ class WorkerNode:
                 except Exception as e:
                     # 작업 실패 시 Master Node에 실패 메시지 전송 (작업 재할당을 위해)
                     print(f"{self.worker_id} 작업 실패: C[{i}, {j}], {e}")
-                    self.client_socket.sendall(f"{self.worker_id} failed task for C[{i}, {j}]".encode('utf-8'))
+                    self.client_socket.sendall(f"{self.worker_id} failed task for C[{i}, {j}]<END>".encode('utf-8'))
                     self.failure_count += 1
                     self.report_queue_status()
 
@@ -118,9 +121,7 @@ class WorkerNode:
 
         # 작업 수신 및 처리 스레드를 생성
         threading.Thread(target=self.receive_task).start()  # 작업 수신 스레드
-        
-        
-        threading.Thread(target=self.process_task).start()  # 작업 처리 스레드``
+        threading.Thread(target=self.process_task).start()  # 작업 처리 스레드
 
 # Worker Node 실행
 if __name__ == "__main__":
