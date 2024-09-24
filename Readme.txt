@@ -1,26 +1,33 @@
 1조 조원 역할
 
 20203043 권수현 - 코딩
+
 20203058 남태인 - 코딩
-20203072 안민호 –과제의 기본 틀 제작, readme.txt작성, git 공동작업 생성
-queue_status 작업
-(자세하게 코딩한 부분을 자신이 적을 것, 자신이 한 것)
+
+20203072 안민호 –과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성, queue_status 작업
 
 1. 프로그램 구성요소 :
 
 <master.py 구성요소>
+
 - __init__ (생성자) : Master Node를 초기화(호스트, 포트설정, 시스템 클락, worker node 관리, 행렬 A, B 난수 생성, 작업 큐 및 실패 작업 큐 생성)
 - handle_worker : Worker Node와 연결 처리, worker ID 부여, 상태 관리
 - distribute_tasks : 
 - add_tasks_to_queue : 행렬 A와 B의 모든 요소에 대한 곱셈 작업을 큐에 추가
-- find_load_worker : Worker Node의 queue 상태를 기반으로 가장 적합한 Worker Node를 찾음.queue 남은 작업 공간(queue_remaining)이 많은 Worker Node 선택Worker Node의 queue_remaining이 같을 경우, worker ID가 작은 Worker Node가 우선 선택
+- find_load_worker : Worker Node의 queue 상태를 기반으로 가장 적합한 Worker Node를 찾음. queue 남은 작업 공간(queue_remaining)이 많은 Worker Node 선택Worker Node의 queue_remaining이 같을 경우, worker ID가 작은 Worker Node가 우선 선택
 - worker_status_all_full : 모든 Worker Node의 queue가 가득 찼는지 확인, 작업 공간이 하나라도 남아 있을 시 False, 가득 찬 경우 True 반환
 - receive_worker_status : Worker Node로부터 주기적으로 Worker Node의 상태 정보를 수신 및 업데이트Worker Node의 queue_remaining과 queue_used (사용 중인 queue)를 업데이트
 - receive_results : Worker Node가 작업(행렬 곱셈) 완료한 후 결과를 Master Node에 수신하고, 성공 여부를 판단성공 시 완료된 작업 기록, 실패 시 해당 작업을 failed_queue에 넣어 Master Node가 재할당할 수 있게 함
 - run : Master Node의 메인 실행 메서드, Worker Node와 통신, 작업 추가, 분배 등을 각각의 스레드에서 동시 처리하도록 함
 
 <worker.py 구성요소>
-- 
+
+- __init__ (생성자) : Worker Node를 초기화(Master Node에 연결될 IP와 포트 저장, 시스템 클락 초기화, 작업 큐 성공/실패 카운트 설정)
+- connect_to_master : Master Node에 연결하고, 연결 성공 시 Worker ID를 할당
+- report_queue_status : 현재 사용 중인 큐 크기와 남은 큐 공간을 Master Node에 보고. 작업 성공/실패할 때에도 큐의 상태를 알려줌
+- receive_task : Master Node로부터 작업 수신. 수신한 작업 데이터를 큐에 넣고, 큐가 가득찬 경우, 작업을 실패로 처리. 실패 메시지는 Master Node로 전송
+- process_task : 작업 queue에서 작업을 꺼내 실제로 처리. 작업 처리시 1~3초의 시간이 소요. 작업이 80%확률로 성공, 20%확률로 실패하도록 처리
+- run : Worker Node를 실행, Master Node와 연결 설정 후, 작업 수신과 작업 처리를 각가가 별도 스레드에서 동시 수행함
 
 
 2. 소스코드 컴바일방법
