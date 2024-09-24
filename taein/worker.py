@@ -70,7 +70,6 @@ class WorkerNode:
                         try:
                             self.task_queue.put(complete_task, timeout=1)  # 큐에 작업을 추가
                             print(f"작업 수신: {self.worker_id}")
-                            self.process_task()
                             self.report_queue_status()
                         except Full:
                             print(f"작업 실패: {self.worker_id}의 큐가 가득 참")
@@ -117,7 +116,7 @@ class WorkerNode:
 
         # 작업 수신 및 처리 스레드를 생성
         threading.Thread(target=self.receive_task).start()  # 작업 수신 스레드
-        #threading.Thread(target=self.process_task).start()  # 작업 처리 스레드``
+        threading.Thread(target=self.process_task).start()  # 작업 처리 스레드``
 
 # Worker Node 실행
 if __name__ == "__main__":
