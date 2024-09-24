@@ -136,6 +136,8 @@ class MasterNode:
         while True:
             try:
                 status_data = client_socket.recv(1024).decode()  # Worker Node로부터 상태 수신
+                
+         
                 if status_data:
                     status = json.loads(status_data)  # 상태 데이터를 JSON으로 디코딩
                     self.worker_status[worker_id] = {

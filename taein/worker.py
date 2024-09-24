@@ -60,6 +60,7 @@ class WorkerNode:
         while True:
             try:
                 task_data = self.client_socket.recv(1024).decode()  # 작업 수신
+                
                 if task_data:
                     buffer += task_data  # 버퍼에 데이터 추가
                     if "<END>" in buffer:  # 구분자 확인
@@ -97,7 +98,7 @@ class WorkerNode:
                     #time.sleep(random.uniform(1, 3))
 
                     # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
-                    if random.random() < 0.99:
+                    if random.random() < 0.8:
                         # 성공 시: 성공 메시지 전송
                         self.client_socket.sendall(f"{self.worker_id} 성공: C[{i}, {j}]".encode('utf-8'))
                         self.success_count += 1
