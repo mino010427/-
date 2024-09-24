@@ -68,13 +68,11 @@ class MasterNode:
 
             else:
                 if not self.task_queue.empty():
-                    with self.lock:
-                        task_data = self.task_queue.get()
+                    task_data = self.task_queue.get()
 
                     # Worker 노드가 모두 작업 큐가 가득 찼는지 확인
-                    if self.worker_status_all_full():
-                        while self.worker_status_all_full():  # 큐가 가득 찼으면, 상태가 변할 때까지 대기
-                            time.sleep(0.1)
+                    while self.worker_status_all_full():  # 큐가 가득 찼으면, 상태가 변할 때까지 대기
+                        time.sleep(0.1)
 
                     # 가장 적합한 Worker에게 작업 전송
                     selected_worker_id = self.find_load_worker()  # 큐가 가장 여유로운 Worker 찾기
@@ -84,7 +82,7 @@ class MasterNode:
                             print(f"작업 전송: {worker_id}")
                             break
 
-            #time.sleep(1)
+            time.sleep(1)
 
 
     def add_tasks_to_queue(self):
@@ -95,8 +93,8 @@ class MasterNode:
                 B_col = self.B[:, j].tolist()
                 task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
                 
-                with self.lock:  # 큐에 접근할 때 뮤텍스 잠금
-                    self.task_queue.put(task_data)
+                #with self.lock:  # 큐에 접근할 때 뮤텍스 잠금
+                self.task_queue.put(task_data)
 
    
             
@@ -183,7 +181,7 @@ class MasterNode:
         print(f"Master Node 시작 {self.host}:{self.port}")
 
         # Worker Node의 접속을 기다림
-        while self.connected_workers < 4:
+        while self.connected_workers < 1:
             client_socket, address = server_socket.accept()
             self.handle_worker(client_socket, address)
             
