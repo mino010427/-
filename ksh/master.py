@@ -4,8 +4,6 @@ import numpy as np
 import time
 from queue import Queue
 import json
-#import debugpy
-#debugpy.debug_this_thread()
 
 class SystemClock:
     def __init__(self):
@@ -190,7 +188,7 @@ class MasterNode:
             #작업 결과를 받기 위한 스레드 시작
             threading.Thread(target=self.receive_results, args=(client_socket,)).start()
             #워커의 상태를 받기 위한 스레드 시작
-            threading.Thread(target=self.receive_worker_status, args=(client_socket,self.worker_ids[client_socket])).start()
+            threading.Thread(target=self.receive_worker_status, args=(client_socket,self.connected_workers)).start()
             
 
 
