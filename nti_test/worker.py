@@ -39,24 +39,6 @@ class WorkerNode:
                 break
         print(f"Worker ID 할당: {self.worker_id}")
 
-    def report_queue_status(self):
-        # 작업이 성공하거나 실패할 때마다 Master Node에 큐 상태 보고
-        try:
-            queue_size = self.task_queue.qsize()  # 현재 큐에 있는 작업 개수
-            max_size = self.task_queue.maxsize    # 큐의 최대 크기
-            queue_remaining = max_size - queue_size  # 남은 큐 공간 계산
-
-            # 작업 큐 상태 전송 (현재 작업 개수와 남은 공간)
-            queue_status = {
-                'worker_id': self.worker_id,
-                'queue_used': queue_size,          # 현재 큐에 있는 작업 개수
-                'queue_remaining': queue_remaining  # 남은 큐 공간
-            }
-            self.client_socket.sendall((json.dumps(queue_status) + "<END>").encode('utf-8'))
-            print(f"{self.worker_id} 큐 상태 보고 - 사용 중: {queue_size}, 남은 공간: {queue_remaining}")
-        except Exception as e:
-            print(f"큐 상태 보고 중 오류 발생: {e}")
-
     def receive_task(self):
         buffer = ""  # 데이터 버퍼
         print('Master Node로부터 작업 수신 시작')
@@ -81,19 +63,41 @@ class WorkerNode:
                         # 큐가 가득 찬 경우 작업 실패 처리
                         try:
                             self.task_queue.put(complete_task, timeout=1)  # 큐에 작업을 추가
-                            print(f"작업 수신: {self.worker_id}")
-                            self.report_queue_status()
+                            print(f"작업 수신 성공: {self.worker_id} / C[{i}, {j}]")
+
+                            # 남은 큐 공간 계산
+                            queue_remaining = self.task_queue.maxsize - self.task_queue.qsize()
+                            print(queue_remaining, self.task_queue.qsize())
+                            # 성공 메시지를 worker_id와 좌표 정보(i, j) 및 남은 큐 공간 정보로 구성
+                            success_message = json.dumps({
+                                "worker_id": self.worker_id,
+                                "status": "received",
+                                "task": f"C[{i}, {j}]",
+                                "queue_remaining": queue_remaining
+                            }) + "<END>"
+
+                            # 성공 메시지 전송
+                            self.client_socket.sendall(success_message.encode('utf-8'))
+
                         except Full:
                             # 큐가 가득 찬 경우 작업 실패 메시지 생성 및 전송
                             print(f"작업 실패: {self.worker_id}의 큐가 가득 참 C[{i},{j}]")
                             self.failure_count += 1
-                            
-                            # 실패 메시지를 worker_id와 좌표 정보(i, j)로 구성
-                            failure_message = f"{self.worker_id} failed to receive task for C[{i}, {j}]<END>"
+
+                            # 남은 큐 공간 계산
+                            queue_remaining = self.task_queue.maxsize - self.task_queue.qsize()
+
+                            # 실패 메시지를 worker_id와 좌표 정보(i, j) 및 남은 큐 공간 정보로 구성
+                            failure_message = json.dumps({
+                                "worker_id": self.worker_id,
+                                "status": "failed",
+                                "task": f"C[{i}, {j}]",
+                                "queue_remaining": queue_remaining
+                            }) + "<END>"
 
                             # 실패 메시지 전송
                             self.client_socket.sendall(failure_message.encode('utf-8'))
-                            self.report_queue_status()
+
             except Exception as e:
                 print(f"Error receiving task: {e}")
                 break
@@ -116,24 +120,39 @@ class WorkerNode:
                     # A_row와 B_col을 곱해서 C[i, j] 값을 계산
                     result = sum(a * b for a, b in zip(A_row, B_col))  # 행렬 곱 연산
 
+                    # 남은 큐 공간 계산
+                    queue_remaining = self.task_queue.maxsize - self.task_queue.qsize()
+
                     # 연산 성공/실패 확률 적용 (80% 성공, 20% 실패)
                     if random.random() < 0.8:
                         # 성공 시: C[i, j]와 연산 결과를 포함한 메시지를 전송
-                        success_message = f"{self.worker_id} 성공: C[{i}, {j}] = {result}<END>"
+                        success_message = json.dumps({
+                            "worker_id": self.worker_id,
+                            "status": "success",
+                            "task": f"C[{i}, {j}]",
+                            "result": result,
+                            "queue_remaining": queue_remaining
+                        }) + "<END>"
+
                         print(f"{self.worker_id} 작업 성공: C[{i}, {j}] = {result}")
                         self.client_socket.sendall(success_message.encode('utf-8'))
                         self.success_count += 1
-                        self.report_queue_status()
                     else:
                         raise Exception("Random failure occurred")
 
                 except Exception as e:
                     # 작업 실패 시 Master Node에 실패 메시지 전송 (작업 재할당을 위해)
-                    failure_message = f"{self.worker_id} failed task for C[{i}, {j}]<END>"
+                    queue_remaining = self.task_queue.maxsize - self.task_queue.qsize()
+                    failure_message = json.dumps({
+                        "worker_id": self.worker_id,
+                        "status": "failed",
+                        "task": f"C[{i}, {j}]",
+                        "queue_remaining": queue_remaining
+                    }) + "<END>"
+
                     self.client_socket.sendall(failure_message.encode('utf-8'))
                     print(f"{self.worker_id} 작업 실패: C[{i}, {j}], {e}")
                     self.failure_count += 1
-                    self.report_queue_status()
 
     def run(self):
         # Master Node와 연결
