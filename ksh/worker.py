@@ -22,6 +22,7 @@ class WorkerNode:
         self.success_count = 0
         self.failure_count = 0
         self.log_file = None
+        self.stop_flag=True
 
     def log_event(self, message):
         timestamp = f"[{self.system_clock.get_elapsed_time():.2f}] "
@@ -50,7 +51,7 @@ class WorkerNode:
     def receive_task(self):
         buffer = ""
         self.log_event('Master Node로부터 작업 수신 시작')
-        while True:
+        while self.stop_flag:
             try:
                 task_data = self.client_socket.recv(1024).decode()
                 if task_data:
@@ -59,6 +60,12 @@ class WorkerNode:
                         complete_task = buffer.split("<END>")[0]
                         buffer = buffer.split("<END>")[1]
 
+                         # Master Node로부터 "complete" 신호를 받으면 종료
+                        if complete_task == "complete":
+                            self.stop_flag=False
+                            self.log_event("Master Node로부터 모든 작업 완료 신호 수신. 작업 종료.")
+                            break
+                            
                         try:
                             task_json = json.loads(complete_task)
                             i, j = task_json['i'], task_json['j']
@@ -100,7 +107,7 @@ class WorkerNode:
                 break
 
     def process_task(self):
-        while True:
+        while self.stop_flag:
             if not self.task_queue.empty():
                 task_data = self.task_queue.get()
 

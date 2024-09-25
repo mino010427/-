@@ -18,16 +18,18 @@ class MasterNode:
         self.port = port
         self.system_clock = SystemClock()
         self.worker_sockets = []
+        self.M=4
         self.connected_workers = 0
         self.worker_ids = {}
         self.worker_status = {}
-        self.A = np.random.randint(1, 100, (10, 10))  
-        self.B = np.random.randint(1, 100, (10, 10))  
+        self.A = np.random.randint(1, 100, (self.M, self.M))  
+        self.B = np.random.randint(1, 100, (self.M, self.M))  
         self.task_queue = Queue()
         self.failed_queue = Queue()
         self.lock = threading.Lock()
-        self.result_matrix = np.zeros((10, 10))
+        self.result_matrix = np.zeros((self.M, self.M))
         self.log_file = open("Master.txt", "w")
+        self.stop_flag=True
 
     def log_event(self, message):
         timestamp = f"[{self.system_clock.get_elapsed_time():.2f}] "
@@ -50,7 +52,7 @@ class MasterNode:
             self.log_event("Worker Node 4개 연결 완료, 작업 분배 시작...")
 
     def distribute_tasks(self):
-        while True:
+        while self.stop_flag:
             if not self.failed_queue.empty():
                 with self.lock:
                     failed_task_info = self.failed_queue.get()
@@ -85,8 +87,8 @@ class MasterNode:
                 time.sleep(0.5)
 
     def add_tasks_to_queue(self):
-        for i in range(10):
-            for j in range(10):
+        for i in range(self.M):
+            for j in range(self.M):
                 A_row = self.A[i, :].tolist()
                 B_col = self.B[:, j].tolist()
                 task_data = json.dumps({'i': i, 'j': j, 'A_row': A_row, 'B_col': B_col})
@@ -116,7 +118,7 @@ class MasterNode:
     def receive_results(self, worker_socket):
         buffer = ""
         try:
-            while True:
+            while self.stop_flag:
                 result = worker_socket.recv(1024).decode()
                 buffer += result
                 if "<END>" in buffer:
@@ -150,16 +152,37 @@ class MasterNode:
 
                         with self.lock:
                             self.result_matrix[i, j] = result_value
+                            
+                self.check_completion()
 
-                    with self.lock:
-                        if np.all(self.result_matrix != 0):
-                            self.log_event("모든 작업 완료. 최종 행렬:")
-                            self.log_event(f"\n{self.result_matrix}")
-                            print(self.result_matrix)
-                            break
+        
 
         except Exception as e:
             self.log_event(f"오류 발생: {self.worker_ids[worker_socket]} / {e}")
+
+
+    def check_completion(self):
+        with self.lock:
+            # 모든 worker의 queue_remaining 값이 10인지 확인
+            all_workers_idle = all(status['queue_remaining'] == 10 for status in self.worker_status.values())
+            
+            # task_queue와 failed_queue가 모두 비어 있는지 확인
+            no_pending_tasks = self.task_queue.empty() and self.failed_queue.empty()
+            
+            # 두 조건이 모두 만족하면 stop_flag를 False로 설정
+            if all_workers_idle and no_pending_tasks:
+                self.stop_flag = False
+                # 모든 Worker에게 "complete<END>" 메시지를 전송
+                for worker_socket in self.worker_sockets:
+                    try:
+                        worker_socket.send("complete<END>".encode('utf-8'))
+                        self.log_event(f"Worker Node {self.worker_ids[worker_socket]}에게 complete 메시지 전송.")
+                    except Exception as e:
+                        self.log_event(f"Worker Node {self.worker_ids[worker_socket]}에게 complete 메시지 전송 실패: {e}")
+            
+                self.log_event("모든 작업 완료. Master Node 종료 준비 중.")
+                
+
 
     def run(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -178,6 +201,14 @@ class MasterNode:
 
         distribution_thread = threading.Thread(target=self.distribute_tasks)
         distribution_thread.start()
+        
+        distribution_thread.join()
+     
+        
+        self.log_event("모든 작업 완료. 최종 행렬:")
+        self.log_event(f"\n{self.result_matrix}")
+        print(self.result_matrix)
+        
 
 if __name__ == "__main__":
     master_node = MasterNode(host="0.0.0.0", port=5000)
