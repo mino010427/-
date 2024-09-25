@@ -4,7 +4,7 @@
 
 20203058 남태인 - 디버깅, 분배 알고리즘 설계, readme.txt 작성, git 공동 작업 생성, 과제 전반적인 스레드 관리, 코드 해석
 
-20203072 안민호 – 과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성, 코드 해석
+20203072 안민호 – 과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성, 코드 해석, 발표
 
 
 
@@ -15,7 +15,7 @@
 
 - __init__ (생성자) : Master Node를 초기화(호스트, 포트설정, 시스템 클락, worker node 관리, 행렬 A, B 난수 생성, 작업 큐 및 실패 작업 큐 생성)
 
-- run()  : 소켓 연결, Worker Node와 통신, 작업 추가, 작업 분배, 스레드 관리
+- run()  : 소켓 연결, Worker Node와 통신, 작업 추가, 작업 분배, 스레드 관리, 로그 관리(최종 로그 출력)
 
 - handle_worker : 연결된 Worker Node 정보 저장, worker ID 부여, 관리
 
@@ -93,112 +93,111 @@
 
 3. 작업 분배 및 부하 분산에 사용한 알고리즘 설명
 
-작업 분배는 receive_worker_status 스레드와 distribute_tasks 스레드에 의해서 이루어 진다.
-receive_worker_status는 worker 작업 큐의 남은 공간의 상태를 받아 master 노드의 클래스 변수인 worker_status를 업데이트 한다.
-distribute_task는 worker_status를 참고하여 현재 가장 작업 공간이 많은 worker로 task를 전달한다.
-worker_status의 값이 동일한 경우에는 worker_id가 작은 worker로 task를 전달한다.
+ distribute_tasks()는 작업 분배 함수
+이는 스레드로 동작하며 task_queue와 failed_queue에 있는 작업을 분배
+부하 분산을 줄이기 위해 워커4개의 작업 큐 상태를 받고 처리하는 방식을 사용
 
-⦁ 장점 : 현재 worker의 상태를 확인 후 task를 분배하므로 균등한 작업 분배가 이루어진다.
+worker_status_all_full()로 4개의 워커의 작업 큐 모두 찼으면 대기를 하고 find_load_worker()로 queue remaining 값이 가장 작은 워커에게 작업을 분배
 
-⦁ 단점 : worker로부터 data를 받는 스레드의 개수가 증가하여 구조가 복잡하다.
+평소에는 task_queue에 있는 작업을 분배하다가 워커에서 실패한 작업이 failed_queue에 들어오면 이를 우선적으로 위의 작업 분배 방식과 동일하게 failed_queue의 작업을 분배한다.
+
+⦁ 장점 : 모든 worker의 queue 상태를 확인 후 task를 분배하므로 균등한 작업 분배가 이루어진다.
+
+⦁ 단점 : X
 
 
 
 4. Error or Additional Message Handling
 
-▶ Error Handling (Exception 처리)
+▶ Error Handling (Exception 처리 포함)
 ⊙ Master Node
-	- 데이터 수신 중 발생하는 오류 처리
-	  Worker Node와의 통신 문제가 발생 시 오류 원인 기록 및 문제 해결
+	- 예외/오류 발생 시 오류 내용을 로그 파일에 기록하여 문제 추적에
+	  도움을 주어 시스템 안정성을 높임
 
-	- 예외 발생 시 적절한 로그를 남기고 시스템 안정성을 높임
+	▷ 예외 처리가 적용된 메서드 : receive_results, log_event
+	⦁ receive_results
+		- recv(1024)를 통해 데이터를 수신할 때, 오류 발생 시 오류 처리
+		  예외 발생 시, 해당 오류 메시지를 로그에 기록
 
-	⦁ 예외 처리 부분 : receive_task
-		- recv(1024)를 통해 데이터를 수신할 때, 문제 발생 시 Exception 발생
-		  어떤 Worker에서 오류가 발생했는지 출력, 오류 내용을 e로 출력
+	⦁ log_event
+		- 각 이벤트를 기록하는 함수로, 오류 발생 시 log_event를 통해 기록
+
 
 ⊙ Worker Node
-	- 작업 수신, 큐 상태 보고, 작업 처리 중 발생하는 오류 처리
-	  시스템이 안정적으로 동작할 수 있도록 함
 
-	- 각 단계에서 오류를 로그로 남기고 Master Node와 통신 문제를 신속하게 처리
+	▷ 예외 처리가 적용된 메서드 : receive_task, process_task
 
-	⦁ 예외 처리 부분 :
-	  - receive_queue_status
-		- 큐 상태를 보고할 때, sendall을 통해 데이터 전송 과정에서 오류 발생 가능
-		- '큐 상태 보고 중 오류 발생: {e}' 메시지를 출력해 어떤 오류가 발생했는지 기록
+	  ⦁ receive_task
+		- task data를 수신하는 과정에서 발생할 수 있는 모든 예외를 처리,
+		  예외 발생 시 해당 오류 메시지를 기록
 
-	  - receive_task
-		- recv로 작업 수신 중 문제 발생 시 Exception 발생, 오류는 Error receiving task: {e} 메시지로 기록
+		- task_data를 JSON으로 디코딩 중 발생하는 JSONDecodeError와 Key 		   Error를 포착
+		   데이터가 잘못된 경우, 로그 파일에 오류 메시지를 기록
+
+		- 큐가 full이면 작업 실패 메시지를 Master Node에 전송, 로그에 기록
 		☆ 기대 효과: 작업 수신 중 통신 오류, 데이터 손상 등의 문제를 처리
 
-	   - process_task
+	   ⦁ process_task
 		- 작업 처리 중 실패 또는 예외 상황 발생 시 Exception 발생
-		- 실패한 작업은 메시지로 출력되고, Master Node로 실패 메시지 전송
-		☆ 기대 효과: 작업 처리 중 오류 발생 시 상황을 기록, Master Node에게 재할당 요청할 수 있음
+
+		- 실패한 작업은 메시지로 출력되고, Master Node로 메시지 전송
+
+		- 로그 파일에 작업 실패와 오류 정보를 기록
+		☆ 기대 효과: 작업 처리 중 오류 발생 시 상황을 기록,
+				  Master Node에게 재할당 요청할 수 있음
 
 ▶ Additional Message Handling
 
-◇메시지 처리 방식
+◇ 메시지 처리 방식
 - 버퍼 관리 및 <END> 구분자를 통한 메시지 처리
 	Worker Node로부터 받은 데이터를 버퍼에 저장
-	<END>구분자 기준으로 메시지의 끝을 판단하여 데이터가 잘 수신되었는지 확인 후 처리
-
-사용된 메서드 : receive_worker_status, receive_results
+	<END>구분자 기준으로 메시지의 끝을 판단하여 데이터가 잘 수신되었는지 	확인 후 처리
 
 ◆ Master Node
-⦁ "{worker_id}연결, {address}"
-	Worker Node가 Master Node에 성공적으로 연결됐을 때 출력
+⦁ print(log_message)
+	모든 로그 출력: 각 이벤트에 대한 메시지와 경과시간 출력
 
-⦁ "Worker Node 4개 연결, 작업 분배..."
-	4개의 Worker Node가 모두 연결된 후, Master Node가 작업 분배를 시작하기 전에 출력
+⦁ self.log_event(f"{worker_id} 연결, {address}")
+	워커 연결: 워커 노드가 마스터 노드에 연결될 때 출력
 
-⦁ "실패 작업 재전송: {worker_id} / C[{i}, {j}]"
-	특정 Worker Node에서 실패한 작업이 재전송될 때 출력 / 실패한 작업의 행렬 인덱스 출력
+⦁ self.log_event("Worker Node 4개 연결 완료, 작업 분배 시작...")
+	연결 완료: 워커 4개가 연결된 후 작업 분배를 시작할 때 출력
 
-⦁ "작업 전송: {worker_id}"
-	새로운 작업이 Worker Node로 전송될 때 출력
+⦁ self.log_event(f"실패 작업 재전송: {worker_id} / C[{i}, {j}]")
+	재전송: 실패한 작업이 다시 워커에게 전송될 때 출력
 
-⦁ "Worker {worker_id} 상태 - 사용 중: {status['queue_used']}, 남은 공간: {status['queue_remaining']}"
-	특정 Worker Node로부터 작업 큐의 상태를 수신할 때 출력
-	현재 사용중인 작업 큐 공간과 남은 공간이 출력
+⦁ self.log_event(f"작업 전송: {worker_id}")
+	작업 전송: 새로운 작업이 워커에게 전송될 때 출력
 
-⦁ "작업실패: {self.worker_ids[worker_socket]} / C[{i}, {j}]"
-	특정 Worker Node가 작업을 처리하는 데 실패했을 때 실패한 작업의 행렬 인덱스를 포함해서 출력
+⦁ self.log_event(f"\n{self.result_matrix}")
+	최종 결과 행렬 출력
 
-⦁ "작업성공: {self.worker_ids[worker_socket]} / C[{i}, {j}]"
-	Worker Node가 작업을 성공적으로 완료했을 때 출력 (인덱스 포함)
+⦁ self.log_event(f"오류 발생: {self.worker_ids[worker_socket]} / {e}")
+	오류 발생 시 출력
 
-⦁ "오류!: {self.worker_ids[worker_socket]} / {e}"
-	작업 처리 중 에러 발생 시 Worker ID와 해당 에러 메시지가 출력
-	- 예시) 오류!: worker2 / ConnectionResetError: [Errno 104] Connection reset by peer
-
-⦁ "Master Node 시작 {self.host}:{self.port}"
-	Master Node가 시작될 때 출력되고, 어떤 IP와 포트에서 실행 중인지 출력
+⦁ self.log_event(f"작업 수신 성공: {worker_id} - 남은 큐 공간: {queue_remaining}")
+	작업 수신 성공: 워커가 작업 수신 시 출력
 
 ◆ Worker Node
 ⦁ "Master Node와 연결 {self.master_host}:{self.master_port}"
-	Worker Node가 Master Node와 연결에 성공했을 때 Matster Node의 IP주소와 포트를 표시
+	Worker Node가 Master Node와 연결에 성공했을 때
+	Matster Node의 IP주소와 포트를 표시
 
 ⦁ "Worker ID 할당: {self.worker_id}"
-	Worker Node가 Master Node로부터 고유의 Worker ID를 할당 받은 후 출력
+       Worker Node가 Master Node로부터 고유의 Worker ID를 할당 받은 후 출력
 
-⦁ "{self.worker_id} 큐 상태 보고 - 사용 중: {queue_size}, 남은 공간: {queue_remaining}"
-	Worker Node가 Master Node에게 현재 작업 큐 상태를 보고할 때 출력
-	작업 큐에 남은 공간과 사용 중인 공간 표시
-	- 예시) worker1 큐 상태 보고 - 사용 중: 2, 남은 공간: 8
-
-⦁ "작업 수신: {self.worker_id}"
-	Worker Node가 Master Node로부터 작업을 수신하여 작업 큐에 넣었을 때 출력
-
-⦁ "작업 실패: {self.worker_id}의 큐가 가득 참"
+⦁ "작업 수신 성공: {self.worker_id} / C[{i}, {j}]"
+	
+⦁ "작업 실패: {self.worker_id}의 큐가 가득 참 C[{i},{j}]"
 	Worker Node의 작업 큐가 가득 차서 더 이상 작업을 받을 수 없을 때 출력
 
 ⦁ "작업 처리: {self.worker_id} / C[{i}, {j}]"
-	Worker Node가 작업 큐에서 특정 작업을 처리할 때 작업의 행렬 인덱스 포함 출력
+	Worker Node가 작업 큐에서 특정 작업을 처리할 때
+	작업의 행렬 인덱스 포함 출력
 
 ⦁ "{self.worker_id} 성공: C[{i}, {j}]"
-	Worker Node가 작업을 성공적으로 처리한 후 Master Node로 성공 메시지를 전송, 로그로 출력
+	Worker Node가 작업을 성공적으로 처리한 후 Master Node로
+	성공 메시지를 전송, 로그로 출력
 	- 예시) worker1 성공: C[120, 500]
 
 ⦁ "{self.worker_id} 작업 실패: C[{i}, {j}], {e}"
@@ -206,13 +205,23 @@ worker_status의 값이 동일한 경우에는 worker_id가 작은 worker로 tas
 	실패 작업의 행렬 인덱스와 실패원인 e를 포함해서 출력
 	- 예시) worker1 작업 실패: C[120, 580], Random failure occurred
 
-⦁ "큐 상태 보고 중 오류 발생: {e}"
-	Master Node로 큐 상태를 보고하는 과정에서 오류 발생시 출력
-	- 예시) 큐 상태 보고 중 오류 발생: ConnectionError
+⦁ "작업 완료 후 로그 기록 시작"
+	모든 작업이 완료된 후 로그 기록 시작 시 출력
 
-⦁ "Error receiving task: {e}"
-	Master Node로부터 작업을 수신하는 중 오류 발생 시 출력
-	- 예시) Error receiving task: ConnectionResetError
+⦁ "연산 성공 횟수: {self.success_count}, 실패 횟수: {self.failure_count}"
+	총 성공/실패한 작업 수를 기록할 때 출력
+
+⦁ "작업 처리량: {total_tasks}, 평균 대기시간: {avg_waiting_time:.2f}초"
+	작업 처리량과 평균 대기시간 출력
+
+⦁ "전체 수행시간: {self.system_clock.get_elapsed_time():.2f}초"
+	전체 수행시간 기록 시 출력
+
+⦁ "작업 완료 후 로그 기록이 실행되었습니다."
+	작업 완료 후 로그 기록이 실행됐음을 출력
+
+⦁ "Master Node와 연결 {self.master_host}:{self.master_port}"
+	워커가 마스터 노드와 연결됐을 때 출력
 
 
 
@@ -250,4 +259,5 @@ eval() 함수의 문제 (보안문제, 문자열을 보다 안전하게 주고 �
 
 09/19 ~ 09/25
 코드 수정 (불필요한 코드 제거, 오류 처리)
-보고서 작성
+보고서 작성(Readme)
+영상 촬영 및 제출
