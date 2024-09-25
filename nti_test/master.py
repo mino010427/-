@@ -13,7 +13,7 @@ class SystemClock:
         return time.time() - self.start_time
 
 class MasterNode:
-    def __init__(self, host='0.0.0.0', port=9999):
+    def __init__(self, host='0.0.0.0', port=5000):
         self.host = host
         self.port = port
         self.system_clock = SystemClock()
@@ -82,7 +82,7 @@ class MasterNode:
                             print(f"작업 전송: {worker_id}")
                             break
                         
-                time.sleep(0.3)
+                time.sleep(0.5)
 
     def add_tasks_to_queue(self):
         # 모든 작업을 task_queue에 추가
