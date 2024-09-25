@@ -87,7 +87,7 @@
 	    worker_node = WorkerNode(master_host="34.68.170.234", master_port=9999)
 	    worker_node.run()
  	
-⑧ 4개의 worker node가 master node와 연결되자마자 프로그램이 실행된다.
+⑧ 4개의 worker node가 master node와 연결되면 프로그램이 실행된다.
 
 
 
