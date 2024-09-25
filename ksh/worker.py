@@ -146,23 +146,40 @@ class WorkerNode:
     def finalize_and_log(self):
         total_tasks = self.success_count + self.failure_count
         avg_waiting_time = self.system_clock.get_elapsed_time() / total_tasks if total_tasks > 0 else 0
+
+        # 로그 기록 확인용 메시지 추가
+        self.log_event("작업 완료 후 로그 기록 시작")
+
+        # 연산 성공 및 실패 횟수 로그 기록
         self.log_event(f"연산 성공 횟수: {self.success_count}, 실패 횟수: {self.failure_count}")
+        
+        # 작업 처리량 및 평균 대기시간 로그 기록
         self.log_event(f"작업 처리량: {total_tasks}, 평균 대기시간: {avg_waiting_time:.2f}초")
+        
+        # 전체 수행시간 로그 기록
         self.log_event(f"전체 수행시간: {self.system_clock.get_elapsed_time():.2f}초")
+        
+        # 로그 기록 완료 확인 메시지
+        self.log_event("작업 완료 후 로그 기록 완료")
 
     def run(self):
         self.connect_to_master()
 
+        # 작업 수신 및 처리 스레드 시작
         receive_thread = threading.Thread(target=self.receive_task)
         receive_thread.start()
 
         process_thread = threading.Thread(target=self.process_task)
         process_thread.start()
 
-        # 연결 종료 전 로그 기록
+        # 스레드 종료 대기
         receive_thread.join()
         process_thread.join()
+
+        # 스레드가 종료된 후 로그 기록
         self.finalize_and_log()
+        self.log_event("작업 완료 후 로그 기록이 실행되었습니다.")
+
 
 if __name__ == "__main__":
     worker_node = WorkerNode(master_host="127.0.0.1", master_port=5000)

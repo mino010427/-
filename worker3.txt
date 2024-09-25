@@ -1,18 +1,2 @@
-[0.01] Worker ID 할당: worker3
+[0.00] Worker ID 할당: worker3
 [0.01] Master Node로부터 작업 수신 시작
-[5.42] 작업 수신 성공: worker3 / C[0, 4]
-[5.42] 작업 처리: worker3 / C[0, 4]
-[5.91] 작업 수신 성공: worker3 / C[0, 5]
-[6.98] worker3 작업 실패: C[0, 4], Random failure occurred
-[6.98] 작업 처리: worker3 / C[0, 5]
-[9.22] worker3 작업 실패: C[0, 5], Random failure occurred
-[9.43] 작업 수신 성공: worker3 / C[0, 5]
-[9.43] 작업 처리: worker3 / C[0, 5]
-[9.43] 작업 수신 성공: worker3 / C[1, 2]
-[10.93] 작업 수신 성공: worker3 / C[1, 5]
-[12.38] worker3 작업 실패: C[0, 5], Random failure occurred
-[12.38] 작업 처리: worker3 / C[1, 2]
-[13.68] worker3 작업 성공: C[1, 2] = 37530
-[13.68] 작업 처리: worker3 / C[1, 5]
-[13.95] 작업 수신 성공: worker3 / C[2, 1]
-[14.45] 작업 수신 성공: worker3 / C[2, 2]
