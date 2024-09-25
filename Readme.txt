@@ -4,7 +4,7 @@
 
 20203058 남태인 - 
 
-20203072 안민호 – 과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성, queue_status 작업
+20203072 안민호 – 과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성
 
 
 
@@ -23,6 +23,7 @@ while
 	
 	- receive_results : Worker Node가 작업(행렬 곱셈) 완료한 후 결과를 Master Node에 수신,
 				성공 시 완료된 작업 기록, 실패 시 해당 작업을 failed_queue에 넣어 Master Node가 재할당시킴
+
 	- distribute_tasks : 작업 분배
 		- worker_status_all_full : 모든 Worker Node의 queue가 가득 찼는지 확인
 					작업 공간이 하나라도 남아 있을 시 False, 가득 찬 경우 True 반환
@@ -52,22 +53,29 @@ while
 	머신 유형 : e2-micro
 	부팅 디스크 : Debian
 
-② 생성된 인스턴스의 SSH를 실행한다.
-
-③ Python과 개발 도구의 패키지를 설치한다
-	sudo apt update
-	sudo apt install python3-pip
-	pip install numpy scipy
-
-④ 방화벽 규칙을 추가한다
+② 방화벽 규칙을 추가한다
 	대상 : 모든 인스턴스 선택
 	소스 IP 범위 : 0.0.0.0/0  (모든 IP 주소 허용)
 	프로토콜 및 포트 : TCP와 해당 포트를 지정 (port : 9999)
 
-⑤ UPLOAD FILE을 클릭하여 master.py를 업로드한다.
+③ 생성된 인스턴스의 SSH를 실행한다.
+
+④ Python과 개발 도구의 패키지들을 설치한다 (Debian 기준)
+	sudo apt update
+	sudo apt install python3
+	sudo apt install python3-pip
+	pip install numpy
+	pip install numpy scipy
+	pip install loguru //Python에서 로그(logging)기능을 제공하는 라이브러리
+
+⑤ 가상환경을 생성하고 활성화한다.
+	python3 -m venv myenv(가상환경 이름)
+	source myenv/bin/activate //가상환경 활성화
+
+⑥ UPLOAD FILE을 클릭하여 master.py를 업로드한다.
 	master.py가 업로드된 디렉터리에서 python3 master.py로 masternode를 실행한다.
 
-⑥ 로컬에서 powershell 터미널 4개를 열어 터미널마다 workernode를 python3 worker.py으로 실행한다.
+⑦ 로컬에서 powershell 터미널 4개를 열어 터미널마다 workernode를 python3 worker.py으로 실행한다.
 	
 	※주의할 점 
 		worker.py코드 마지막 부분 master_host="외부 IP 번호"에서
@@ -78,6 +86,8 @@ while
 	    worker_node = WorkerNode(master_host="34.68.170.234", master_port=9999)
 	    worker_node.run()
  	
+⑧ 4개의 worker node가 master node와 연결되자마자 프로그램이 실행된다.
+
 
 
 3. 작업 분배 및 부하 분산에 사용한 알고리즘 설명
