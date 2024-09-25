@@ -95,15 +95,16 @@
 
  distribute_tasks()는 작업 분배 함수
 이는 스레드로 동작하며 task_queue와 failed_queue에 있는 작업을 분배
-부하 분산을 줄이기 위해 워커4개의 작업 큐 상태를 받고 처리하는 방식을 사용
+부하 분산을 줄이기 위해 워커4개의 작업 상태를 바탕으로 처리하는 방식을 사용
 
-worker_status_all_full()로 4개의 워커의 작업 큐 모두 찼으면 대기를 하고 find_load_worker()로 queue remaining 값이 가장 작은 워커에게 작업을 분배
+worker_status_all_full()로 4개의 워커의 작업 큐 모두 찼으면 대기를 하고 find_load_worker()로 queue remaining 값이 가장 큰 워커에게 작업을 분배
 
-평소에는 task_queue에 있는 작업을 분배하다가 워커에서 실패한 작업이 failed_queue에 들어오면 이를 우선적으로 위의 작업 분배 방식과 동일하게 failed_queue의 작업을 분배한다.
+평소에는 task_queue에 있는 작업을 분배하다가 워커에서 실패한 작업이 failed_queue에 들어오면 이를 우선적으로 작업 분배 방식과 동일하게 failed_queue의 작업을 분배한다.
 
-⦁ 장점 : 모든 worker의 queue 상태를 확인 후 task를 분배하므로 균등한 작업 분배가 이루어진다.
+⦁ 장점 : 모든 worker의 queue 상태를 확인 후 task를 분배하므로 균등한 작업 분배가 	 	이루어진다. 
+	class 변수로부터 상태를 확인해서 빠르게 worker의 상태를 확인할 수 있다
 
-⦁ 단점 : X
+⦁ 단점 : (없음)
 
 
 
@@ -152,77 +153,6 @@ worker_status_all_full()로 4개의 워커의 작업 큐 모두 찼으면 대기
 - 버퍼 관리 및 <END> 구분자를 통한 메시지 처리
 	Worker Node로부터 받은 데이터를 버퍼에 저장
 	<END>구분자 기준으로 메시지의 끝을 판단하여 데이터가 잘 수신되었는지 	확인 후 처리
-
-◆ Master Node
-⦁ print(log_message)
-	모든 로그 출력: 각 이벤트에 대한 메시지와 경과시간 출력
-
-⦁ self.log_event(f"{worker_id} 연결, {address}")
-	워커 연결: 워커 노드가 마스터 노드에 연결될 때 출력
-
-⦁ self.log_event("Worker Node 4개 연결 완료, 작업 분배 시작...")
-	연결 완료: 워커 4개가 연결된 후 작업 분배를 시작할 때 출력
-
-⦁ self.log_event(f"실패 작업 재전송: {worker_id} / C[{i}, {j}]")
-	재전송: 실패한 작업이 다시 워커에게 전송될 때 출력
-
-⦁ self.log_event(f"작업 전송: {worker_id}")
-	작업 전송: 새로운 작업이 워커에게 전송될 때 출력
-
-⦁ self.log_event(f"\n{self.result_matrix}")
-	최종 결과 행렬 출력
-
-⦁ self.log_event(f"오류 발생: {self.worker_ids[worker_socket]} / {e}")
-	오류 발생 시 출력
-
-⦁ self.log_event(f"작업 수신 성공: {worker_id} - 남은 큐 공간: {queue_remaining}")
-	작업 수신 성공: 워커가 작업 수신 시 출력
-
-◆ Worker Node
-⦁ "Master Node와 연결 {self.master_host}:{self.master_port}"
-	Worker Node가 Master Node와 연결에 성공했을 때
-	Matster Node의 IP주소와 포트를 표시
-
-⦁ "Worker ID 할당: {self.worker_id}"
-       Worker Node가 Master Node로부터 고유의 Worker ID를 할당 받은 후 출력
-
-⦁ "작업 수신 성공: {self.worker_id} / C[{i}, {j}]"
-	
-⦁ "작업 실패: {self.worker_id}의 큐가 가득 참 C[{i},{j}]"
-	Worker Node의 작업 큐가 가득 차서 더 이상 작업을 받을 수 없을 때 출력
-
-⦁ "작업 처리: {self.worker_id} / C[{i}, {j}]"
-	Worker Node가 작업 큐에서 특정 작업을 처리할 때
-	작업의 행렬 인덱스 포함 출력
-
-⦁ "{self.worker_id} 성공: C[{i}, {j}]"
-	Worker Node가 작업을 성공적으로 처리한 후 Master Node로
-	성공 메시지를 전송, 로그로 출력
-	- 예시) worker1 성공: C[120, 500]
-
-⦁ "{self.worker_id} 작업 실패: C[{i}, {j}], {e}"
-	Worker Node가 작업을 처리하는 도중 오류발생하여 작업 실패 시 출력
-	실패 작업의 행렬 인덱스와 실패원인 e를 포함해서 출력
-	- 예시) worker1 작업 실패: C[120, 580], Random failure occurred
-
-⦁ "작업 완료 후 로그 기록 시작"
-	모든 작업이 완료된 후 로그 기록 시작 시 출력
-
-⦁ "연산 성공 횟수: {self.success_count}, 실패 횟수: {self.failure_count}"
-	총 성공/실패한 작업 수를 기록할 때 출력
-
-⦁ "작업 처리량: {total_tasks}, 평균 대기시간: {avg_waiting_time:.2f}초"
-	작업 처리량과 평균 대기시간 출력
-
-⦁ "전체 수행시간: {self.system_clock.get_elapsed_time():.2f}초"
-	전체 수행시간 기록 시 출력
-
-⦁ "작업 완료 후 로그 기록이 실행되었습니다."
-	작업 완료 후 로그 기록이 실행됐음을 출력
-
-⦁ "Master Node와 연결 {self.master_host}:{self.master_port}"
-	워커가 마스터 노드와 연결됐을 때 출력
-
 
 
 5. Additional Comments (팀플 날짜 기록)
