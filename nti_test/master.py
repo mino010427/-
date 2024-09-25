@@ -198,5 +198,5 @@ class MasterNode:
 
 # Google Cloud VM에서 실행될 Master Node
 if __name__ == "__main__":
-    master_node = MasterNode(host="0.0.0.0", port=9999)  # 외부 통신을 허용하는 IP
+    master_node = MasterNode(host="0.0.0.0", port=5000)  # 외부 통신을 허용하는 IP
     master_node.run()

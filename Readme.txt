@@ -17,22 +17,22 @@
 
 - run()  : 소켓 연결, Worker Node와 통신, 작업 추가, 분배 등 각각의 스레드에서 동시 처리
 
+- handle_worker : Worker Node와 연결 처리, worker ID 부여, 관리
+
 while
-	- handle_worker : Worker Node와 연결 처리, worker ID 부여, 관리
 	
 	- receive_results : Worker Node가 작업(행렬 곱셈) 완료한 후 결과를 Master Node에 수신,
 				성공 시 완료된 작업 기록, 실패 시 해당 작업을 failed_queue에 넣어 Master Node가 재할당시킴
-	- receive_worker_status : Worker Node로부터 주기적으로 Worker Node의 상태 정보를 수신 및 업데이트
-					 Worker Node의 queue_remaining과 queue_used (사용 중인 queue)를 업데이트
+	- distribute_tasks : 작업 분배
+		- worker_status_all_full : 모든 Worker Node의 queue가 가득 찼는지 확인
+					작업 공간이 하나라도 남아 있을 시 False, 가득 찬 경우 True 반환
+
+		- find_load_worker : Worker Node의 queue 상태를 기반으로 남은 queue 작업 공간이 많은 Worker Node 선택
+				   남은 큐 공간이 같을 경우, worker ID가 작은 Worker Node가 우선 선택
+
  
 - add_tasks_to_queue : 곱셈 작업을 큐에 추가
 
-- distribute_tasks : 작업 분배
-	- worker_status_all_full : 모든 Worker Node의 queue가 가득 찼는지 확인
-					작업 공간이 하나라도 남아 있을 시 False, 가득 찬 경우 True 반환
-
-	- find_load_worker : Worker Node의 queue 상태를 기반으로 남은 queue 작업 공간이 많은 Worker Node 선택
-				   남은 큐 공간이 같을 경우, worker ID가 작은 Worker Node가 우선 선택
 
 ◆ worker.py 구성요소
 
@@ -42,11 +42,7 @@ while
 	- connect_to_master : Master Node에 연결하고, 연결 성공 시 Worker ID를 할당
 
 - receive_task : Master Node로부터 작업 수신. 수신한 작업 데이터를 큐에 넣고, 큐가 가득찬 경우, 작업을 실패로 처리.
-	- report_queue_status : worker ID와 현재 사용 중인 큐 크기(used)와 남은 큐 공간(remaining)을 Master Node에 보고
-
 - process_task : 작업 queue에서 작업을 꺼내 처리. 작업 처리시 1~3초의 시간이 소요. 작업이 80%확률로 성공, 20%확률로 실패하도록 처리
-	- report_queue_status : worker ID와 현재 사용 중인 큐 크기(used)와 	남은 큐 공간(remaining)을 Master Node에 보고
-
 
 
 2. 소스코드 컴파일 방법 (GCP 사용)

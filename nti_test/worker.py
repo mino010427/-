@@ -164,5 +164,5 @@ class WorkerNode:
 
 # Worker Node 실행
 if __name__ == "__main__":
-    worker_node = WorkerNode(master_host="127.0.0.1", master_port=9999)
+    worker_node = WorkerNode(master_host="34.68.170.234", master_port=5000)
     worker_node.run()
