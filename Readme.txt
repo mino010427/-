@@ -1,10 +1,10 @@
 1조 조원 구성 및 역할
 
-20203043 권수현 - 
+20203043 권수현 - 코딩, 디버깅, git 공동 작업 생성, 과제 전반적인 스레드 관리, 코드 해석, 구글 클라우드 인스턴스 생성, 로그 관리
 
-20203058 남태인 - 
+20203058 남태인 - 디버깅, 분배 알고리즘 설계, readme.txt 작성, git 공동 작업 생성, 과제 전반적인 스레드 관리, 코드 해석
 
-20203072 안민호 – 과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성
+20203072 안민호 – 과제의 기본 코드 틀 제작, readme.txt작성, git 공동작업 생성, 구글 클라우드 인스턴스 생성, 코드 해석
 
 
 
@@ -15,21 +15,21 @@
 
 - __init__ (생성자) : Master Node를 초기화(호스트, 포트설정, 시스템 클락, worker node 관리, 행렬 A, B 난수 생성, 작업 큐 및 실패 작업 큐 생성)
 
-- run()  : 소켓 연결, Worker Node와 통신, 작업 추가, 분배 등 각각의 스레드에서 동시 처리
+- run()  : 소켓 연결, Worker Node와 통신, 작업 추가, 작업 분배, 스레드 관리
 
-- handle_worker : Worker Node와 연결 처리, worker ID 부여, 관리
+- handle_worker : 연결된 Worker Node 정보 저장, worker ID 부여, 관리
 
-while
-	
-	- receive_results : Worker Node가 작업(행렬 곱셈) 완료한 후 결과를 Master Node에 수신,
-				성공 시 완료된 작업 기록, 실패 시 해당 작업을 failed_queue에 넣어 Master Node가 재할당시킴
+스레드 및 함수
+   
+   - receive_results : Worker Node가 작업(행렬 곱셈) 완료한 후 결과를 Master Node에 수신,
+            성공 시 완료된 작업 저장 및 진행도 출력, 실패 시 해당 작업을 failed_queue에 넣어 Master Node가 재할당시킴
 
-	- distribute_tasks : 작업 분배
-		- worker_status_all_full : 모든 Worker Node의 queue가 가득 찼는지 확인
-					작업 공간이 하나라도 남아 있을 시 False, 가득 찬 경우 True 반환
+   - distribute_tasks : 작업 분배
+      - worker_status_all_full : 모든 Worker Node의 queue가 가득 찼는지 확인
+               작업 공간이 하나라도 남아 있을 시 False, 가득 찬 경우 True 반환
 
-		- find_load_worker : Worker Node의 queue 상태를 기반으로 남은 queue 작업 공간이 많은 Worker Node 선택
-				   남은 큐 공간이 같을 경우, worker ID가 작은 Worker Node가 우선 선택
+      - find_load_worker : Worker Node의 queue 상태를 기반으로 남은 queue 작업 공간이 많은 Worker Node 선택
+               남은 큐 공간이 같을 경우, worker ID가 작은 Worker Node가 우선 선택
 
  
 - add_tasks_to_queue : 곱셈 작업을 큐에 추가
@@ -40,10 +40,11 @@ while
 - __init__ (생성자) : Worker Node를 초기화(Master Node에 연결될 IP와 포트 저장, 시스템 클락 초기화, 작업 큐 성공/실패 카운트 설정)
 
 - run : Master Node와 연결 설정
-	- connect_to_master : Master Node에 연결하고, 연결 성공 시 Worker ID를 할당
+   - connect_to_master : Master Node에 연결하고, 연결 성공 시 Worker ID를 할당
 
-- receive_task : Master Node로부터 작업 수신. 수신한 작업 데이터를 큐에 넣고, 큐가 가득찬 경우, 작업을 실패로 처리.
-- process_task : 작업 queue에서 작업을 꺼내 처리. 작업 처리시 1~3초의 시간이 소요. 작업이 80%확률로 성공, 20%확률로 실패하도록 처리
+- receive_task : Master Node로부터 작업 수신. 수신한 작업 데이터를 큐에 넣고, 큐가 가득찬 경우, 작업을 실패로 처리. 수신 성공 여부 및 worker노드의 상태 전송
+- process_task : 작업 queue에서 작업을 꺼내 처리. 작업 처리시 1~3초의 시간이 소요. 작업이 80%확률로 성공, 20%확률로 실패하도록 처리. 작업 처리 결과 및 worker노드의 상태 전송
+
 
 
 2. 소스코드 컴파일 방법 (GCP 사용)
