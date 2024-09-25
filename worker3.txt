@@ -1,0 +1,2 @@
+[0.01] Worker ID 할당: worker3
+[0.01] Master Node로부터 작업 수신 시작
