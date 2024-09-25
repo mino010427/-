@@ -18,44 +18,38 @@ class MasterNode:
         self.port = port
         self.system_clock = SystemClock()
         self.worker_sockets = []
-        self.connected_workers = 0  # 접속한 Worker Node 수
-        self.worker_ids = {}  # Worker ID 매핑
-        self.worker_status = {}  # 각 Worker Node의 큐 상태를 저장할 딕셔너리
-        self.A = np.random.randint(1, 100, (10, 10))  # 10x10 행렬 A
-        self.B = np.random.randint(1, 100, (10, 10))  # 10x10 행렬 B
-        self.task_queue = Queue()  # 작업 큐
-        self.failed_queue = Queue()  # 실패한 작업 큐 추가
-        self.lock = threading.Lock()  # 뮤텍스 추가
-        self.result_matrix = np.zeros((10, 10))  # 10x10 결과 행렬 초기화
-
-        # 로그 파일 초기화
+        self.connected_workers = 0
+        self.worker_ids = {}
+        self.worker_status = {}
+        self.A = np.random.randint(1, 100, (10, 10))  
+        self.B = np.random.randint(1, 100, (10, 10))  
+        self.task_queue = Queue()
+        self.failed_queue = Queue()
+        self.lock = threading.Lock()
+        self.result_matrix = np.zeros((10, 10))
         self.log_file = open("Master.txt", "w")
 
     def log_event(self, message):
-        # 로그를 파일과 터미널에 출력
         timestamp = f"[{self.system_clock.get_elapsed_time():.2f}] "
         log_message = timestamp + message
         self.log_file.write(log_message + "\n")
-        self.log_file.flush()  # 즉시 로그 기록
+        self.log_file.flush()
         print(log_message)
 
     def handle_worker(self, client_socket, address):
-        # Worker Node를 연결 목록에 추가 및 ID 할당
         self.connected_workers += 1
         worker_id = f"worker{self.connected_workers}"
         self.worker_ids[client_socket] = worker_id
         self.worker_sockets.append(client_socket)
-        self.worker_status[worker_id] = {'queue_used': 0, 'queue_remaining': 10}  # 초기 큐 상태 저장
+        self.worker_status[worker_id] = {'queue_used': 0, 'queue_remaining': 10}
         self.log_event(f"{worker_id} 연결, {address}")
 
-        # Worker에게 ID를 명시적으로 전송
         client_socket.sendall((worker_id + "<END>").encode('utf-8'))
 
         if self.connected_workers == 4:
             self.log_event("Worker Node 4개 연결 완료, 작업 분배 시작...")
 
     def distribute_tasks(self):
-        buffer = ""
         while True:
             if not self.failed_queue.empty():
                 with self.lock:
@@ -100,8 +94,8 @@ class MasterNode:
         self.log_event("모든 작업을 작업 큐에 추가 완료")
 
     def find_load_worker(self):
-        max_remaining = -1  # 가장 큰 queue_remaining 값을 저장할 변수
-        selected_worker = None  # 선택된 Worker의 ID를 저장할 변수
+        max_remaining = -1
+        selected_worker = None
 
         for worker_id, status in self.worker_status.items():
             remaining = status['queue_remaining']
@@ -127,7 +121,7 @@ class MasterNode:
                 buffer += result
                 if "<END>" in buffer:
                     complete_result = buffer.split("<END>")[0]
-                    buffer = buffer.split("<END>")[1]  # 남은 데이터는 버퍼에 저장
+                    buffer = buffer.split("<END>")[1]
 
                     result_data = json.loads(complete_result)
 
@@ -137,12 +131,12 @@ class MasterNode:
                     self.worker_status[worker_id]['queue_used'] = 10 - queue_remaining
 
                     if result_data["status"] == "failed":
-                        task_data = result_data["task"].split("C[")[1].split(']')[0]  # C[i, j]에서 i, j 추출
+                        task_data = result_data["task"].split("C[")[1].split(']')[0]
                         i, j = map(int, task_data.split(', '))
                         self.log_event(f"작업 실패: {worker_id} / C[{i}, {j}]")
 
                         with self.lock:
-                            self.result_matrix[i, j] = -1  # 실패한 작업은 -1로 저장
+                            self.result_matrix[i, j] = -1
                             self.failed_queue.put(f"C[{i}, {j}]")
 
                     elif result_data["status"] == "received":
@@ -160,6 +154,7 @@ class MasterNode:
                     with self.lock:
                         if np.all(self.result_matrix != 0):
                             self.log_event("모든 작업 완료. 최종 행렬:")
+                            self.log_event(f"\n{self.result_matrix}")
                             print(self.result_matrix)
                             break
 
