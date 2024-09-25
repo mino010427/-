@@ -115,7 +115,7 @@ class WorkerNode:
 
                 try:
                     # 작업 처리 (랜덤하게 1~3초 소요되는 작업 시뮬레이션)
-                    time.sleep(random.uniform(1, 3))
+                    time.sleep(random.uniform(0.3, 1))
 
                     # A_row와 B_col을 곱해서 C[i, j] 값을 계산
                     result = sum(a * b for a, b in zip(A_row, B_col))  # 행렬 곱 연산
@@ -164,5 +164,5 @@ class WorkerNode:
 
 # Worker Node 실행
 if __name__ == "__main__":
-    worker_node = WorkerNode(master_host="34.68.170.234", master_port=5000)
+    worker_node = WorkerNode(master_host="127.0.0.1", master_port=5000)
     worker_node.run()

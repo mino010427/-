@@ -21,8 +21,8 @@ class MasterNode:
         self.connected_workers = 0  # 접속한 Worker Node 수
         self.worker_ids = {}  # Worker ID 매핑
         self.worker_status = {}  # 각 Worker Node의 큐 상태를 저장할 딕셔너리
-        self.A = np.random.randint(1, 100, (10, 10))  # 10x10 행렬 A
-        self.B = np.random.randint(1, 100, (10, 10))  # 10x10 행렬 B
+        self.A = np.random.randint(1, 10, (10, 10))  # 10x10 행렬 A
+        self.B = np.random.randint(1, 10, (10, 10))  # 10x10 행렬 B
         self.task_queue = Queue()  # 작업 큐
         self.failed_queue = Queue()  # 실패한 작업 큐 추가
         self.lock = threading.Lock()  # 뮤텍스 추가
@@ -82,7 +82,7 @@ class MasterNode:
                             print(f"작업 전송: {worker_id}")
                             break
                         
-                time.sleep(0.5)
+                time.sleep(0.12)
 
     def add_tasks_to_queue(self):
         # 모든 작업을 task_queue에 추가
